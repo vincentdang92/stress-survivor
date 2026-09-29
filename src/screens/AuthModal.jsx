@@ -5,15 +5,26 @@ import {
   onAuthChange, getCurrentUser, pullPlayerData,
 } from '../supabase.js';
 
-// ── AuthForm — component hoàn toàn độc lập, không nhận props thay đổi ─────────
-// Dùng uncontrolled inputs (useRef) → không bao giờ re-render vì parent
-function AuthForm({ isLinkMode, onClose, onAuthSuccess }) {
+// ── Debug log collector (chỉ dùng khi debug=true) ─────────────────────────────
+const debugLogs = [];
+function dbg(...args) {
+  const line = args.map(a => {
+    try { return typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a); } catch { return String(a); }
+  }).join(' ');
+  console.log('[AuthDebug]', ...args);
+  debugLogs.push(`${new Date().toISOString().slice(11,19)} ${line}`);
+  if (debugLogs.length > 50) debugLogs.shift();
+}
+
+// ── AuthForm — component hoàn toàn độc lập, inputs dùng useRef ────────────────
+function AuthForm({ isLinkMode, onClose, onAuthSuccess, debug }) {
   const emailRef    = useRef(null);
   const passwordRef = useRef(null);
-  const modeRef     = useRef(isLinkMode ? 'link' : 'signup'); // lưu trong ref, không phải state
+  const modeRef     = useRef(isLinkMode ? 'link' : 'signup');
   const [modeUI, setModeUI]   = useState(modeRef.current);
   const [loading, setLoading] = useState(false);
   const [msg, setMsg]         = useState({ text: '', type: '' });
+  const [rawLog, setRawLog]   = useState('');
 
   const showMsg = (text, type = 'ok') => setMsg({ text, type });
 
@@ -29,44 +40,58 @@ function AuthForm({ isLinkMode, onClose, onAuthSuccess }) {
     const password = (passwordRef.current?.value || '');
     const mode     = modeRef.current;
 
-    if (!email)           return showMsg('Vui lòng nhập email.', 'err');
-    if (!password)        return showMsg('Vui lòng nhập mật khẩu.', 'err');
+    if (!email)              return showMsg('Vui lòng nhập email.', 'err');
+    if (!password)           return showMsg('Vui lòng nhập mật khẩu.', 'err');
     if (password.length < 6) return showMsg('Mật khẩu tối thiểu 6 ký tự.', 'err');
 
     setLoading(true);
     setMsg({ text: '', type: '' });
+    setRawLog('');
 
     try {
+      dbg('Submit', { mode, email });
+
       if (mode === 'link') {
-        const { error } = await upgradeAnonToEmail(email, password);
-        if (error && /session|missing/i.test(error)) {
-          const { error: e2, needConfirm } = await signUpWithEmail(email, password);
-          if (e2)         showMsg('Lỗi: ' + e2, 'err');
-          else if (needConfirm) showMsg('📧 Kiểm tra email để xác nhận tài khoản!', 'ok');
-          else          { showMsg('✅ Tài khoản tạo thành công!', 'ok'); setTimeout(onClose, 1500); }
-        } else if (error) {
-          showMsg('Lỗi: ' + error, 'err');
+        const res = await upgradeAnonToEmail(email, password);
+        dbg('upgradeAnonToEmail result:', res);
+        setRawLog(JSON.stringify(res, null, 2));
+        if (res.error && /session|missing/i.test(res.error)) {
+          const res2 = await signUpWithEmail(email, password);
+          dbg('signUpWithEmail fallback:', res2);
+          setRawLog(JSON.stringify(res2, null, 2));
+          if (res2.error)          showMsg('Lỗi: ' + res2.error, 'err');
+          else if (res2.needConfirm) showMsg('📧 Kiểm tra email để xác nhận!', 'ok');
+          else                     { showMsg('✅ Tài khoản tạo thành công!', 'ok'); setTimeout(onClose, 1500); }
+        } else if (res.error) {
+          showMsg('Lỗi: ' + res.error, 'err');
         } else {
           showMsg('✅ Đã liên kết! Data đồng bộ.', 'ok');
           setTimeout(onClose, 1500);
         }
       } else if (mode === 'login') {
-        const { user, error } = await signInWithEmail(email, password);
-        if (error) showMsg('Sai email hoặc mật khẩu.', 'err');
+        const res = await signInWithEmail(email, password);
+        dbg('signInWithEmail result:', res);
+        setRawLog(JSON.stringify(res, null, 2));
+        if (res.error) showMsg('Sai email hoặc mật khẩu. (' + res.error + ')', 'err');
         else {
           await pullPlayerData();
           showMsg('✅ Đăng nhập thành công!', 'ok');
-          onAuthSuccess?.(user);
+          onAuthSuccess?.(res.user);
           setTimeout(onClose, 1200);
         }
       } else { // signup
-        const { error, needConfirm } = await signUpWithEmail(email, password);
-        if (error)          showMsg('Lỗi: ' + error, 'err');
-        else if (needConfirm) showMsg('📧 Kiểm tra email để xác nhận tài khoản!', 'ok');
-        else                { showMsg('✅ Tài khoản tạo thành công!', 'ok'); setTimeout(onClose, 1500); }
+        const res = await signUpWithEmail(email, password);
+        dbg('signUpWithEmail result:', res);
+        setRawLog(JSON.stringify(res, null, 2));
+        if (res.error)            showMsg('Lỗi: ' + res.error, 'err');
+        else if (res.needConfirm) showMsg('📧 Kiểm tra email để xác nhận tài khoản!', 'ok');
+        else                     { showMsg('✅ Tài khoản tạo thành công!', 'ok'); setTimeout(onClose, 1500); }
       }
     } catch (err) {
-      showMsg('Lỗi: ' + (err?.message || 'Không xác định'), 'err');
+      const errStr = err?.message || JSON.stringify(err) || 'Unknown';
+      dbg('Exception:', errStr);
+      setRawLog('Exception: ' + errStr);
+      showMsg('Lỗi: ' + errStr, 'err');
     }
 
     setLoading(false);
@@ -117,6 +142,20 @@ function AuthForm({ isLinkMode, onClose, onAuthSuccess }) {
 
         {msg.text && <div class={`auth-msg ${msg.type}`}>{msg.text}</div>}
 
+        {/* Debug panel — hiện khi debug=true hoặc có rawLog */}
+        {(debug || rawLog) && (
+          <details class="auth-debug" open={!!rawLog}>
+            <summary>🐛 Debug Log</summary>
+            <pre class="auth-debug-pre">{debugLogs.slice(-10).join('\n')}</pre>
+            {rawLog && (
+              <>
+                <strong style={{ fontSize: 11 }}>Raw API response:</strong>
+                <pre class="auth-debug-pre">{rawLog}</pre>
+              </>
+            )}
+          </details>
+        )}
+
         <button class="btn primary" type="submit" disabled={loading}
           style={{ width: '100%', marginTop: 4, fontSize: 15 }}>
           {loading       ? 'Đang xử lý...'
@@ -137,39 +176,40 @@ function AuthForm({ isLinkMode, onClose, onAuthSuccess }) {
   );
 }
 
-// ── AuthModal — KHÔNG dùng loading state để tránh unmount/remount form ─────────
+// ── AuthModal ─────────────────────────────────────────────────────────────────
 export function AuthModal({ onClose, onAuthSuccess }) {
-  // Khởi tạo ngay với giá trị mặc định — KHÔNG dùng null để tránh render loading spinner
   const [loggedInEmail, setLoggedInEmail] = useState(null);
   const [isLinkMode, setIsLinkMode]       = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
+  const [debug, setDebug]                 = useState(false);
+  const tapCount = useRef(0);
 
-  // Đọc auth state một lần sau khi mount, cập nhật UI phù hợp
   useEffect(() => {
     let cancelled = false;
     getCurrentUser().then(u => {
       if (cancelled) return;
       const anon = u ? (u.is_anonymous ?? !u.email) : true;
-      if (u && !anon) {
-        setLoggedInEmail(u.email);       // đã login bằng email
-      } else if (u && anon) {
-        setIsLinkMode(true);             // anon session → link mode
-      }
-      // Nếu không có user → giữ nguyên default (login/signup tabs)
+      dbg('getCurrentUser:', { uid: u?.id, anon, email: u?.email });
+      if (u && !anon)      setLoggedInEmail(u.email);
+      else if (u && anon)  setIsLinkMode(true);
     });
-
-    // Chỉ lắng nghe SIGNED_IN / SIGNED_OUT / USER_UPDATED
     const unsub = onAuthChange((event, session) => {
       if (cancelled) return;
       if (!['SIGNED_IN', 'SIGNED_OUT', 'USER_UPDATED'].includes(event)) return;
+      dbg('onAuthChange:', event);
       const u = session?.user || null;
       const anon = u ? (u.is_anonymous ?? !u.email) : true;
       if (u && !anon) setLoggedInEmail(u.email);
       else { setLoggedInEmail(null); setIsLinkMode(!!(u && anon)); }
     });
-
     return () => { cancelled = true; unsub(); };
   }, []);
+
+  // Tap tiêu đề 5 lần để bật debug mode
+  const handleTitleTap = () => {
+    tapCount.current += 1;
+    if (tapCount.current >= 5) { setDebug(true); tapCount.current = 0; }
+  };
 
   const handleSignOut = async () => {
     setLogoutLoading(true);
@@ -180,13 +220,12 @@ export function AuthModal({ onClose, onAuthSuccess }) {
     onAuthSuccess?.(null);
   };
 
-  // Đã đăng nhập bằng email
   if (loggedInEmail) {
     return (
       <div class="auth-overlay">
         <div class="auth-modal">
           <div class="auth-header">
-            <h3>👤 Tài khoản</h3>
+            <h3 onClick={handleTitleTap}>👤 Tài khoản</h3>
             <button class="auth-close" type="button" onClick={onClose}>✕</button>
           </div>
           <div class="auth-logged-in">
@@ -194,8 +233,14 @@ export function AuthModal({ onClose, onAuthSuccess }) {
             <div class="auth-email">{loggedInEmail}</div>
             <div class="auth-badge ok">✅ Đã đồng bộ</div>
             <p style={{ fontSize: 13, color: '#666', textAlign: 'center', lineHeight: 1.5 }}>
-              Data nhân vật được lưu và đồng bộ tự động trên mọi thiết bị.
+              Data nhân vật được lưu và đồng bộ tự động.
             </p>
+            {debug && (
+              <details class="auth-debug" open>
+                <summary>🐛 Debug Log</summary>
+                <pre class="auth-debug-pre">{debugLogs.slice(-10).join('\n')}</pre>
+              </details>
+            )}
             <button class="btn" style={{ width: '100%' }} type="button"
               onClick={handleSignOut} disabled={logoutLoading}>
               {logoutLoading ? '...' : '🚪 Đăng xuất'}
@@ -206,34 +251,28 @@ export function AuthModal({ onClose, onAuthSuccess }) {
     );
   }
 
-  // Form đăng nhập / đăng ký — luôn render ngay, KHÔNG có loading state
   return (
     <div class="auth-overlay">
       <div class="auth-modal">
         <div class="auth-header">
-          <h3>{isLinkMode ? '🔗 Lưu tài khoản' : '👤 Đăng nhập'}</h3>
+          <h3 onClick={handleTitleTap}>{isLinkMode ? '🔗 Lưu tài khoản' : '👤 Đăng nhập'}</h3>
           <button class="auth-close" type="button" onClick={onClose}>✕</button>
         </div>
-        {/*
-          AuthForm được render NGAY từ đầu — không có transition loading→form.
-          key cố định → Preact giữ nguyên DOM instance dù parent re-render.
-          Tất cả input dùng useRef → giá trị không bao giờ bị reset.
-        */}
         <AuthForm
           key="auth-form-singleton"
           isLinkMode={isLinkMode}
           onClose={onClose}
           onAuthSuccess={onAuthSuccess}
+          debug={debug}
         />
       </div>
     </div>
   );
 }
 
-/** Compact auth badge dùng trong MenuScreen */
+/** Compact auth badge */
 export function AuthBadge({ onClick }) {
   const [email, setEmail] = useState(null);
-
   useEffect(() => {
     getCurrentUser().then(u => {
       if (u && !(u.is_anonymous ?? !u.email)) setEmail(u.email);
@@ -245,10 +284,9 @@ export function AuthBadge({ onClick }) {
       setEmail(u && !anon ? u.email : null);
     });
   }, []);
-
   return (
     <button class="auth-badge-btn" type="button" onClick={onClick}
-      title={email ? email : 'Đăng nhập để lưu data'}>
+      title={email || 'Đăng nhập để lưu data'}>
       {email ? `✅ ${email.split('@')[0]}` : '👤 Ẩn danh'}
     </button>
   );
