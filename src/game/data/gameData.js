@@ -1,0 +1,168 @@
+/** Game data: enemies, waves, cards, synergies, classes */
+
+// ── Enemies ───────────────────────────────────────────────────────────────
+export const ENEMIES = {
+  email:    { r: 13, hp: 12,   spd: 92,  dmg: 8,  xp: 1, kb: 1,    color: '#9FB4FF', bug: false, charge: false, boss: false },
+  notif:    { r: 11, hp: 6,    spd: 132, dmg: 5,  xp: 1, kb: 1.2,  color: '#FFD447', bug: false, charge: false, boss: false },
+  meeting:  { r: 20, hp: 62,   spd: 52,  dmg: 14, xp: 3, kb: 0.45, color: '#E8E4F2', bug: false, charge: false, boss: false },
+  bug:      { r: 15, hp: 28,   spd: 80,  dmg: 10, xp: 2, kb: 0.8,  color: '#7FD66B', bug: true,  charge: false, boss: false },
+  customer: { r: 18, hp: 46,   spd: 68,  dmg: 16, xp: 3, kb: 0.6,  color: '#FF7A45', bug: false, charge: true,  boss: false },
+  boss:     { r: 46, hp: 3600, spd: 46,  dmg: 24, xp: 0, kb: 0.04, color: '#FF4D6D', bug: false, charge: false, boss: true  },
+};
+
+// HP scales over time: hp × (1 + seconds/95), capped at 170 enemies
+export function scaledHp(base, elapsed) {
+  return Math.round(base * (1 + elapsed / 95));
+}
+
+// ── Waves (1 real second = 1 game minute) ────────────────────────────────
+export const WAVES = [
+  { t: 0,   name: 'Hộp thư đầy',        sub: '08:00 · Email và thông báo dồn dập', rate: 1.0, mix: { email: 6, notif: 3 } },
+  { t: 40,  name: 'Họp liên miên',       sub: '08:40 · Cuộc họp và bug xuất hiện',  rate: 1.5, mix: { email: 4, notif: 2, meeting: 2, bug: 3 } },
+  { t: 80,  name: 'Khách hàng nổi giận', sub: '09:20 · Coi chừng cú lao tới',       rate: 2.0, mix: { email: 3, meeting: 2, bug: 3, customer: 3 } },
+  { t: 120, name: 'Deadline',            sub: '10:00 · Boss xuất hiện',             rate: 1.1, mix: { email: 4, notif: 3, bug: 2 }, boss: true },
+];
+
+// ── Cards ─────────────────────────────────────────────────────────────────
+const dv = (base, lv) => Math.round(base * (1 + 0.25 * (lv - 1)));
+
+export const CARDS = [
+  {
+    id: 'stapler', icon: '📎', name: 'Bấm Ghim Liên Thanh',
+    type: 'weapon', rarity: 'common', tags: ['office', 'speed'],
+    cd: l => 0.5 - l * 0.02,
+    desc: l => `Bắn ${l >= 5 ? 3 : l >= 3 ? 2 : 1} ghim vào địch gần nhất, ${dv(9, l)} sát thương mỗi ghim.`,
+  },
+  {
+    id: 'plane', icon: '✈️', name: 'Máy Bay Giấy',
+    type: 'weapon', rarity: 'common', tags: ['office', 'pierce'],
+    cd: l => 1.15 - l * 0.05,
+    desc: l => `Phóng máy bay theo hướng chạy, xuyên ${2 + l} địch, ${dv(18, l)} sát thương.`,
+  },
+  {
+    id: 'coffee', icon: '💣', name: 'Bom Cà Phê',
+    type: 'weapon', rarity: 'rare', tags: ['coffee', 'aoe', 'fire'],
+    cd: l => 2.3 - l * 0.1,
+    desc: l => `Ném ly cà phê nổ bán kính ${70 + 10 * l}, ${dv(28, l)} sát thương, để lại vũng bỏng.${l >= 4 ? ' Ném 2 ly.' : ''}`,
+  },
+  {
+    id: 'keyboard', icon: '⌨️', name: 'Đập Bàn Phím',
+    type: 'weapon', rarity: 'common', tags: ['rage', 'aoe'],
+    cd: l => 2.9 - l * 0.12,
+    desc: l => `Sóng chấn động bán kính ${100 + 15 * l}, ${dv(22, l)} sát thương, đẩy lùi và xoá đạn địch.`,
+  },
+  {
+    id: 'mouse', icon: '🖱️', name: 'Chuột Không Dây',
+    type: 'weapon', rarity: 'rare', tags: ['developer', 'orbit'],
+    cd: null,
+    desc: l => `${l >= 5 ? 4 : l >= 3 ? 3 : 2} con chuột bay quanh người, ${dv(11, l)} sát thương mỗi lần chạm.`,
+  },
+  {
+    id: 'hotfix', icon: '🩹', name: 'Hotfix Lúc 2 Giờ Sáng',
+    type: 'weapon', rarity: 'epic', tags: ['developer', 'zap'],
+    cd: l => 2.3 - l * 0.1,
+    desc: l => `Tia sét nhảy qua ${3 + l} địch, ${dv(24, l)} sát thương, gấp đôi lên BUG.`,
+  },
+  {
+    id: 'espresso', icon: '☕', name: 'Espresso Double Shot',
+    type: 'passive', rarity: 'common', tags: ['coffee', 'speed'],
+    stat: (s, l) => { s.atkSpd += 0.14 * l; },
+    desc: l => `Tốc đánh +${14 * l}%.`,
+  },
+  {
+    id: 'shoes', icon: '👟', name: 'Giày Chạy Deadline',
+    type: 'passive', rarity: 'common', tags: ['speed'],
+    stat: (s, l) => { s.moveMul += 0.1 * l; },
+    desc: l => `Tốc chạy +${10 * l}%.`,
+  },
+  {
+    id: 'breath', icon: '🌿', name: 'Hít Thở Sâu',
+    type: 'passive', rarity: 'common', tags: ['calm'],
+    stat: (s, l) => { s.maxHp += 20 * l; },
+    desc: l => `Máu tối đa +${20 * l}, hồi 20 máu ngay.`,
+  },
+  {
+    id: 'magnet', icon: '🧲', name: 'Nam Châm Lương',
+    type: 'passive', rarity: 'common', tags: ['office'],
+    stat: (s, l) => { s.pickup += 35 * l; },
+    desc: l => `Hút EXP từ xa hơn (+${35 * l}).`,
+  },
+  {
+    id: 'glasses', icon: '👓', name: 'Kính Soi Lỗi',
+    type: 'passive', rarity: 'rare', tags: ['crit', 'developer'],
+    stat: (s, l) => { s.crit += 0.07 * l; },
+    desc: l => `Tỉ lệ chí mạng +${7 * l}%.`,
+  },
+  {
+    id: 'angry', icon: '😤', name: 'Nổi Nóng Có Kiểm Soát',
+    type: 'passive', rarity: 'rare', tags: ['rage'],
+    stat: (s, l) => { s.dmgMul += 0.12 * l; s.stressGain += 0.15 * l; },
+    desc: l => `Sát thương +${12 * l}%, Stress tăng nhanh hơn.`,
+  },
+  {
+    id: 'headphones', icon: '🎧', name: 'Tai Nghe Chống Ồn',
+    type: 'passive', rarity: 'rare', tags: ['calm'],
+    stat: (s, l) => { s.dr += 0.07 * l; s.stressGain -= 0.1 * l; },
+    desc: l => `Giảm ${7 * l}% sát thương nhận, Stress tăng chậm hơn.`,
+  },
+  {
+    id: 'burnout', icon: '🔥', name: 'Cháy Hết Mình',
+    type: 'passive', rarity: 'epic', tags: ['fire', 'rage'],
+    stat: (s, l) => { s.burnAll += 7 * l; },
+    desc: l => `Mọi đòn gây bỏng ${7 * l}/giây.`,
+  },
+  {
+    id: 'overtime', icon: '🌙', name: 'OT Không Lương',
+    type: 'passive', rarity: 'epic', tags: ['rage', 'speed'],
+    stat: (s, l) => { s.atkSpd += 0.12 * l; s.dmgMul += 0.1 * l; s.maxHp -= 10 * l; },
+    desc: l => `Tốc đánh +${12 * l}%, sát thương +${10 * l}%, máu tối đa −${10 * l}.`,
+  },
+];
+export const CARD = Object.fromEntries(CARDS.map(c => [c.id, c]));
+
+// ── Synergies ─────────────────────────────────────────────────────────────
+export const SYNERGIES = [
+  { id: 'rage_coffee', name: 'RAGE COFFEE',    need: { coffee: 2, rage: 1, speed: 1 }, desc: 'Tốc đánh +50%',                        apply: s => { s.atkSpd += 0.5; } },
+  { id: 'fullstack',   name: 'FULL-STACK',     need: { developer: 2 },                 desc: 'Chí mạng +15%, sát thương lên BUG +50%', apply: s => { s.crit += 0.15; s.bugMul += 0.5; } },
+  { id: 'burn',        name: 'CHÁY DEADLINE',  need: { fire: 2 },                      desc: 'Sát thương bỏng x2',                    apply: s => { s.burnMul *= 2; } },
+  { id: 'zen',         name: 'ZEN OFFICE',     need: { calm: 2 },                      desc: 'Hồi 2 máu mỗi giây',                    apply: s => { s.regen += 2; } },
+  { id: 'supply',      name: 'VĂN PHÒNG PHẨM', need: { office: 3 },                   desc: 'Mọi vũ khí bắn thêm 1 viên',            apply: s => { s.extraProj += 1; } },
+];
+export const SYN = Object.fromEntries(SYNERGIES.map(s => [s.id, s]));
+
+// ── Classes ────────────────────────────────────────────────────────────────
+export const CLASSES = {
+  developer: {
+    name: 'Developer', line: 'Sống bằng cà phê và Stack Overflow.',
+    start: 'stapler', bias: 'developer',
+    passive: 'Debug Mode', pdesc: '+30% sát thương lên địch BUG.',
+    tap: 'Gõ phím: mỗi tap bắn một ký tự code về điểm chạm. Đủ 20 tap thì COMPILE, bắn 16 ký tự ra xung quanh.',
+    soon: false,
+  },
+  manager: {
+    name: 'Manager', line: 'Một con dấu, trăm việc xong.',
+    start: 'plane', bias: 'office',
+    passive: 'Phê Duyệt', pdesc: 'Địch đang mang dấu nhận thêm 15% sát thương.',
+    tap: 'Đóng dấu DUYỆT / TỪ CHỐI tại điểm chạm. Đủ 3 dấu thì địch nổ, vụ nổ đóng thêm dấu lên địch xung quanh.',
+    soon: false,
+  },
+  designer:  { name: 'Designer', line: 'Dời logo sang trái 1px nữa thôi.', soon: true },
+  sales:     { name: 'Sales',    line: 'Chốt đơn cả trong mơ.',            soon: true },
+  chef:      { name: 'Chef',     line: 'Nóng hơn cả bếp là deadline.',      soon: true },
+  driver:    { name: 'Driver',   line: 'Còi to hơn mọi cuộc gọi.',          soon: true },
+};
+
+// ── EXP formula ──────────────────────────────────────────────────────────
+export const nextXp = l => Math.round(6 + 4 * l + 0.4 * l * l);
+
+// ── Card rarity weights ──────────────────────────────────────────────────
+export const RARITY_WEIGHT = { common: 6, rare: 3.2, epic: 1.6 };
+
+// ── Death puns ───────────────────────────────────────────────────────────
+export const PUNS = {
+  email:    ['Đã xem', 'Seen', 'Chuyển tiếp', 'Spam!'],
+  notif:    ['Tắt thông báo', 'Im!', 'Mute'],
+  meeting:  ['Họp xong!', 'Lẽ ra là email', 'Hủy họp'],
+  bug:      ['Fixed', 'Không tái hiện được', 'Works on my machine'],
+  customer: ['Đã xử lý', 'Ticket đóng', 'Hoàn tiền'],
+};
