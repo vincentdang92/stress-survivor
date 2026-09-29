@@ -46,18 +46,39 @@ export async function initAuth() {
   }
 }
 
+
+/** Helper: extract readable message từ bất kỳ dạng error nào */
+function _errMsg(e) {
+  if (!e) return null;
+  if (typeof e === 'string') return e;
+  // Supabase error có thể là object với nhiều dạng khác nhau
+  const msg = e.message || e.error_description || e.msg || e.code;
+  if (msg && typeof msg === 'string') return msg;
+  // Fallback: thử stringify nhưng tránh "{}"
+  try {
+    const s = JSON.stringify(e);
+    return s === '{}' ? 'Lỗi kết nối Supabase' : s;
+  } catch { return 'Lỗi không xác định'; }
+}
+
 /** Đăng nhập bằng email + password */
 export async function signInWithEmail(email, password) {
-  if (!supabase) return { error: 'Offline' };
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  return { user: data?.user, error: error?.message };
+  if (!supabase) return { error: 'Offline — chưa cấu hình Supabase' };
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    return { user: data?.user, error: _errMsg(error) };
+  } catch (e) { return { error: _errMsg(e) }; }
 }
 
 /** Đăng ký tài khoản mới bằng email + password */
 export async function signUpWithEmail(email, password) {
-  if (!supabase) return { error: 'Offline' };
-  const { data, error } = await supabase.auth.signUp({ email, password });
-  return { user: data?.user, error: error?.message, needConfirm: !error && !data?.session };
+  if (!supabase) return { error: 'Offline — chưa cấu hình Supabase' };
+  try {
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error) return { error: _errMsg(error) };
+    // needConfirm = true khi cần xác nhận email (chưa có session ngay)
+    return { user: data?.user, error: null, needConfirm: !data?.session };
+  } catch (e) { return { error: _errMsg(e) }; }
 }
 
 /**
@@ -65,14 +86,14 @@ export async function signUpWithEmail(email, password) {
  * Giữ nguyên auth.uid() → data không mất.
  */
 export async function upgradeAnonToEmail(email, password) {
-  if (!supabase) return { error: 'Offline' };
-  const { data, error } = await supabase.auth.updateUser({ email, password });
-  if (!error) {
-    // Sync local upgrades lên DB
-    await pushPlayerData();
-  }
-  return { user: data?.user, error: error?.message };
+  if (!supabase) return { error: 'Offline — chưa cấu hình Supabase' };
+  try {
+    const { data, error } = await supabase.auth.updateUser({ email, password });
+    if (!error) await pushPlayerData();
+    return { user: data?.user, error: _errMsg(error) };
+  } catch (e) { return { error: _errMsg(e) }; }
 }
+
 
 /** Đăng xuất */
 export async function signOut() {
