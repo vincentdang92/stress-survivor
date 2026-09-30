@@ -47,52 +47,6 @@ function AuthForm({ initialLinkMode, onCloseRef, onAuthSuccessRef, debug }) {
   const [msg, setMsg]         = useState({ text: '', type: '' });
   const [rawLog, setRawLog]   = useState('');
 
-  // Render counter — tăng mỗi lần component function chạy lại
-  const renderCount = useRef(0);
-  renderCount.current += 1;
-
-  // Mount/unmount tracker + DOM mutation observer
-  useEffect(() => {
-    const mountTime = Date.now();
-    dbg(`AuthForm MOUNTED (render #${renderCount.current})`);
-
-    // Theo dõi nếu input bị remove/replace khỏi DOM
-    const obs = new MutationObserver((mutations) => {
-      for (const m of mutations) {
-        for (const node of m.removedNodes) {
-          if (node.nodeType === 1) {
-            dbg('DOM node REMOVED:', node.tagName, node.className || node.type || '');
-          }
-        }
-      }
-    });
-    if (emailRef.current?.parentElement) {
-      obs.observe(emailRef.current.parentElement, { childList: true, subtree: true });
-    }
-
-    // Theo dõi window resize (keyboard open/close trên mobile)
-    const onResize = () => dbg(`window resize: ${window.innerWidth}x${window.innerHeight}`);
-    window.addEventListener('resize', onResize);
-
-    // Theo dõi Supabase auth events
-    const origConsoleWarn = console.warn;
-    console.warn = (...args) => { dbg('warn:', ...args); origConsoleWarn(...args); };
-
-    return () => {
-      dbg(`AuthForm UNMOUNTED after ${Date.now() - mountTime}ms (renders: ${renderCount.current})`);
-      obs.disconnect();
-      window.removeEventListener('resize', onResize);
-      console.warn = origConsoleWarn;
-    };
-  }, []);
-
-  // Log mỗi khi render (không phải unmount)
-  useEffect(() => {
-    if (renderCount.current > 1) {
-      dbg(`AuthForm re-render #${renderCount.current}`);
-    }
-  });
-
   const showMsg = useCallback((text, type = 'ok') => setMsg({ text, type }), []);
 
   const switchMode = useCallback((m) => {
@@ -167,16 +121,6 @@ function AuthForm({ initialLinkMode, onCloseRef, onAuthSuccessRef, debug }) {
 
   return (
     <>
-      {/* Debug bar — luôn hiển thị để theo dõi re-render */}
-      <div style={{
-        fontSize: 10, fontFamily: 'monospace', color: '#888',
-        background: '#f5f5f5', padding: '2px 6px', borderRadius: 4,
-        marginBottom: 6, display: 'flex', gap: 8, flexWrap: 'wrap',
-      }}>
-        <span>renders: <b style={{color: renderCount.current > 3 ? 'red' : 'green'}}>{renderCount.current}</b></span>
-        <span>mode: {modeUI}</span>
-        <span>email: {emailRef.current?.value?.length ?? 0}ch</span>
-      </div>
       {modeUI === 'link' ? (
         <div class="auth-anon-notice">
           <span>⚠️</span>
@@ -260,7 +204,7 @@ export function AuthModal({ onClose, onAuthSuccess }) {
   );
   const [isLinkMode] = useState(initUser && initAnon);
   const [logoutLoading, setLogoutLoading] = useState(false);
-  const [debug, setDebug] = useState(true); // DEBUG: force on
+  const [debug, setDebug] = useState(false);
   const tapCount = useRef(0);
 
   // Stable refs for callbacks — AuthForm reads from these, never re-renders when App changes
