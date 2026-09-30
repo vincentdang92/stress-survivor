@@ -49,7 +49,7 @@ const STATS = [
     icon: '❤️',
     name: 'Max HP',
     costs: [50, 100, 200, 350, 500],
-    bonusText: lvl => lvl > 0 ? `+${lvl * 20} HP` : '+20 HP / cấp',
+    bonusText: lvl => lvl > 0 ? `Max HP: ${100 + lvl * 20} (+${lvl * 20})` : 'Max HP: 100 → 120 → 140...',
   },
   {
     key: 'atk',

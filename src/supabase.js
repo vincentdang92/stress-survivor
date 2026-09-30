@@ -269,19 +269,42 @@ export async function getOrCreatePlayer(displayName, cls = 'developer') {
 
   const anonId = getAnonId();
 
+  // Lấy auth user hiện tại (nếu đã đăng nhập)
+  let authUserId = null;
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    authUserId = user?.id || null;
+  } catch { }
+
   // Thử lấy từ DB
-  const { data: existing, error: fetchErr } = await supabase
+  const { data: existing } = await supabase
     .from('players')
     .select('*')
     .eq('anon_id', anonId)
     .maybeSingle();
 
-  if (existing) { cachePlayer(existing); return existing; }
+  if (existing) {
+    // Nếu đã login nhưng chưa link auth_user_id → update
+    if (authUserId && !existing.auth_user_id) {
+      await supabase
+        .from('players')
+        .update({ auth_user_id: authUserId })
+        .eq('anon_id', anonId);
+      existing.auth_user_id = authUserId;
+    }
+    cachePlayer(existing); return existing;
+  }
 
-  // Tạo mới
+  // Tạo mới — include auth_user_id nếu có
+  const insertData = {
+    anon_id: anonId,
+    display_name: displayName,
+    class: cls,
+    ...(authUserId ? { auth_user_id: authUserId } : {}),
+  };
   const { data: created, error: createErr } = await supabase
     .from('players')
-    .insert({ anon_id: anonId, display_name: displayName, class: cls })
+    .insert(insertData)
     .select()
     .single();
 
