@@ -132,16 +132,23 @@ function AuthForm({ initialLinkMode, onCloseRef, onAuthSuccessRef, debug }) {
       <form onSubmit={handleSubmit} class="auth-form">
         <div class="auth-field">
           <label>Email</label>
-          <input ref={emailRef} type="email" class="lb-input"
+          <input ref={emailRef}
+            type="text"
+            inputmode="email"
+            class="lb-input"
             placeholder="you@example.com"
-            autocomplete="email" autocorrect="off"
-            autocapitalize="none" spellcheck={false} />
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="none"
+            spellcheck={false} />
         </div>
         <div class="auth-field">
           <label>Mật khẩu</label>
-          <input ref={passwordRef} type="password" class="lb-input"
+          <input ref={passwordRef}
+            type="password"
+            class="lb-input"
             placeholder="Tối thiểu 6 ký tự"
-            autocomplete={modeUI === 'login' ? 'current-password' : 'new-password'} />
+            autocomplete="off" />
         </div>
 
         {msg.text && <div class={`auth-msg ${msg.type}`}>{msg.text}</div>}

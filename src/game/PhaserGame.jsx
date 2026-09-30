@@ -69,25 +69,23 @@ export function stopBattle() {
 
 /**
  * Dừng Phaser hoàn toàn khi mở modal UI:
- * 1. Sleep game loop (stop rAF)
- * 2. Disable input manager (stop event listeners)
- * 3. Hide canvas (stop touch target)
+ * 1. Sleep game loop  2. Disable input  3. Hide canvas  4. Stop scale resize listener
  */
 export function pauseGame() {
   if (!phaserInstance) return;
   try {
-    // 1. Stop game loop
     const loop = phaserInstance.loop;
     if (typeof loop?.sleep === 'function') loop.sleep();
     else if (loop) loop.targetFps = 1;
 
-    // 2. Disable entire input system — this removes Phaser's
-    //    touchstart/touchmove/pointerdown listeners from canvas & window
     if (phaserInstance.input) phaserInstance.input.enabled = false;
 
-    // 3. Hide canvas so it can't be a touch target at all
     const c = phaserInstance.canvas;
     if (c) { c.style.display = 'none'; }
+
+    // Stop scale manager resize listener — khi keyboard mở/đóng trên mobile
+    // window resize event sẽ không wake Phaser nữa
+    if (phaserInstance.scale) phaserInstance.scale.stopListeners?.();
   } catch (e) { console.warn('[Phaser] pauseGame:', e.message); }
 }
 
@@ -97,10 +95,12 @@ export function resumeGame() {
   try {
     const loop = phaserInstance.loop;
     if (typeof loop?.wake === 'function') loop.wake();
-    if (loop) loop.targetFps = 1; // stay at 1fps idle
+    if (loop) loop.targetFps = 1;
 
-    // Re-show canvas but keep input disabled (only startBattle enables)
     const c = phaserInstance.canvas;
     if (c) { c.style.display = ''; }
+
+    // Re-enable scale manager
+    if (phaserInstance.scale) phaserInstance.scale.startListeners?.();
   } catch (e) { console.warn('[Phaser] resumeGame:', e.message); }
 }
