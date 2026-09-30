@@ -29,12 +29,6 @@ function dbg(...args) {
   console.log('[Auth]', ...args);
   debugLogs.push(`${new Date().toISOString().slice(11, 19)} ${line}`);
   if (debugLogs.length > 30) debugLogs.shift();
-  // Gửi log về debug server (chạy ở port 5174)
-  fetch('http://localhost:5174/log', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ msg: line }),
-  }).catch(() => {});
 }
 
 // ── AuthForm — completely static, inputs never touched by Preact after mount ──
