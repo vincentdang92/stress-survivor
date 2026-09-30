@@ -102,7 +102,8 @@ function AuthForm({ initialLinkMode, onCloseRef, onAuthSuccessRef, debug }) {
         setRawLog(JSON.stringify(res, null, 2));
         if (res.error === 'AMBIGUOUS') {
           // {} error = không rõ nguyên nhân (email tồn tại hoặc Supabase rate limit)
-          showMsg('⚠️ Không thể tạo tài khoản. Email có thể đã được đăng ký, hoặc thử lại sau ít phút. (Lỗi Supabase SMTP)', 'err');
+          const rawInfo = res._raw ? ` [status:${res._raw.status} code:${res._raw.code}]` : '';
+          showMsg(`⚠️ Không thể tạo tài khoản${rawInfo}. Email có thể đã được đăng ký, hoặc thử lại sau ít phút.`, 'err');
         } else if (res.error === 'EMAIL_EXISTS') {
           // {} error từ Supabase = email có thể đã tồn tại (hoặc enumeration protection)
           // Không auto-switch — cho user tự quyết

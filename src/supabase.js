@@ -91,7 +91,16 @@ export async function signUpWithEmail(email, password) {
   try {
     const { data, error } = await supabase.auth.signUp({ email, password });
 
+    // Log full error object for debugging
     if (error) {
+      console.log('[Auth] signUp raw error:', {
+        message: error.message,
+        status: error.status,
+        code: error.code,
+        name: error.name,
+        full: JSON.stringify(error),
+      });
+
       const rawMsg = error.message || '';
       const msg = rawMsg.toLowerCase().trim();
       const status = error.status || 0;
@@ -99,7 +108,7 @@ export async function signUpWithEmail(email, password) {
       // Supabase trả "{}" → thường do: email đã tồn tại (enumeration protection)
       // hoặc SMTP rate limit (free tier giới hạn ~3 email/giờ)
       if (rawMsg === '{}' || rawMsg === '' || rawMsg === 'null' || rawMsg === 'undefined') {
-        return { error: 'AMBIGUOUS' };
+        return { error: 'AMBIGUOUS', _raw: { msg: rawMsg, status, code: error.code } };
       }
 
       // Email đã tồn tại — Supabase 422 hoặc message rõ ràng
