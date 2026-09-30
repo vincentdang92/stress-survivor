@@ -146,6 +146,7 @@ function AuthForm({ initialLinkMode, onCloseRef, onAuthSuccessRef, debug }) {
           <label>Mật khẩu</label>
           <input ref={passwordRef}
             type="password"
+            inputmode="text"
             class="lb-input"
             placeholder="Tối thiểu 6 ký tự"
             autocomplete="off" />
