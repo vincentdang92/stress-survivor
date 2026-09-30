@@ -25,10 +25,42 @@ export function App() {
   const phaserReadyRef = useRef(false);
   const pendingBattle = useRef(null);
 
-  // Pause Phaser loop khi mở modal → giải phóng main thread cho input
+  // ── GLOBAL INPUT FOCUS HANDLER ────────────────────────────────────────────
+  // Pause Phaser + unlock touch/select whenever ANY input in the app has focus.
+  // Covers: auth modal, name edit, leaderboard search — không cần biết screen nào.
   useEffect(() => {
-    if (showAuth) pauseGame();
-    else resumeGame();
+    const onFocusIn = (e) => {
+      if (e.target.matches('input, textarea, select, [contenteditable]')) {
+        pauseGame();
+        document.body.classList.add('auth-open');
+      }
+    };
+    const onFocusOut = (e) => {
+      if (e.target.matches('input, textarea, select, [contenteditable]')) {
+        // Dùng requestAnimationFrame để check sau khi focus chuyển sang element mới
+        requestAnimationFrame(() => {
+          const active = document.activeElement;
+          if (!active || !active.matches('input, textarea, select, [contenteditable]')) {
+            resumeGame();
+            document.body.classList.remove('auth-open');
+          }
+        });
+      }
+    };
+    document.addEventListener('focusin', onFocusIn, true);
+    document.addEventListener('focusout', onFocusOut, true);
+    return () => {
+      document.removeEventListener('focusin', onFocusIn, true);
+      document.removeEventListener('focusout', onFocusOut, true);
+    };
+  }, []);
+
+  // showAuth effect: vẫn giữ để pause Phaser khi modal mở (trước khi user tap input)
+  useEffect(() => {
+    if (showAuth) { pauseGame(); document.body.classList.add('auth-open'); }
+    else if (!document.activeElement?.matches('input, textarea')) {
+      resumeGame(); document.body.classList.remove('auth-open');
+    }
   }, [showAuth]);
 
   // Init auth + player on mount

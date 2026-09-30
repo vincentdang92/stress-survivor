@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'preact/hooks';
+import { useState, useEffect, useMemo, useRef } from 'preact/hooks';
 import { CLASSES } from '../game/data/gameData.js';
 import { portraitDataURL, enemyPortraitDataURL } from '../game/art/SpriteFactory.js';
 import { updateDisplayName } from '../supabase.js';
@@ -32,7 +32,7 @@ export function MenuScreen({ onStart, onTrial, onBook, onLeaderboard, onUpgrade,
   const [portraits, setPortraits] = useState({});
   const [enemyPortraits, setEnemyPortraits] = useState({});
   const [editingName, setEditingName] = useState(false);
-  const [nameInput, setNameInput] = useState('');
+  const nameInputRef = useRef(null); // uncontrolled — không re-render khi gõ
 
 
   useEffect(() => {
@@ -79,7 +79,7 @@ export function MenuScreen({ onStart, onTrial, onBook, onLeaderboard, onUpgrade,
   };
 
   const handleSaveName = async () => {
-    const name = nameInput.trim();
+    const name = (nameInputRef.current?.value || '').trim();
     if (!name) return;
     await updateDisplayName(name);
     // Update localStorage
@@ -146,20 +146,20 @@ export function MenuScreen({ onStart, onTrial, onBook, onLeaderboard, onUpgrade,
                 🆔 {player.public_id || 'STRESS-LOCAL'}
               </span>
               {!editingName ? (
-                <button class="linkbtn" onClick={() => { setEditingName(true); setNameInput(player.display_name || ''); }}>
+                <button class="linkbtn" onClick={() => setEditingName(true)}>
                   ✏️ {player.display_name || 'Đặt tên'}
                 </button>
               ) : (
                 <span style={{ display: 'flex', gap: 6 }}>
                   <input
+                    ref={nameInputRef}
                     style={{ font: '700 13px var(--mono)', border: 'var(--bd)', borderRadius: 8, padding: '4px 10px', outline: 'none', fontSize: 16, touchAction: 'manipulation' }}
-                    value={nameInput}
+                    defaultValue={player?.display_name || ''}
                     maxLength={30}
                     inputmode="text"
                     autocorrect="off"
                     autocapitalize="words"
                     spellcheck={false}
-                    onInput={e => setNameInput(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') handleSaveName(); if (e.key === 'Escape') setEditingName(false); }}
                     autoFocus
                   />
