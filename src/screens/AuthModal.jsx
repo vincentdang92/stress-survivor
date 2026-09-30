@@ -86,7 +86,7 @@ function AuthForm({ initialLinkMode, onCloseRef, onAuthSuccessRef, debug }) {
         if (res.error === 'EMAIL_NOT_CONFIRMED') {
           showMsg('📧 Email chưa được xác nhận. Vui lòng kiểm tra hộp thư và click link xác nhận.', 'err');
         } else if (res.error === 'WRONG_PASSWORD') {
-          showMsg('❌ Sai email hoặc mật khẩu.', 'err');
+          showMsg('❌ Sai email hoặc mật khẩu. Nếu vừa đăng ký, hãy kiểm tra email xác nhận trước.', 'err');
         } else if (res.error) {
           showMsg('Lỗi: ' + res.error, 'err');
         } else {
