@@ -159,6 +159,10 @@ export function LeaderboardScreen({ onClose }) {
                 class="lb-input"
                 placeholder="Nhập Player ID (STRESS-XXXXXX)"
                 value={search}
+                inputmode="text"
+                autocorrect="off"
+                autocapitalize="none"
+                spellcheck={false}
                 onInput={e => setSearch(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleSearch()}
               />

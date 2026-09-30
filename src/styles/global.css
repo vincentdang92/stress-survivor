@@ -56,6 +56,13 @@ body.auth-open .auth-overlay textarea {
 }
 button { font: inherit; color: inherit; cursor: pointer; border: none; background: none; }
 button:focus-visible { outline: 3px solid var(--grape); outline-offset: 3px; }
+/* Global input fix cho mobile: font-size>=16px ngăn iOS zoom, touch-action ngăn freeze */
+input, textarea, select {
+  font-size: 16px;
+  touch-action: manipulation;
+  -webkit-appearance: none;
+  appearance: none;
+}
 img { max-width: 100%; display: block; }
 
 /* ─── Layout ─────────────────────────────────── */

@@ -152,9 +152,13 @@ export function MenuScreen({ onStart, onTrial, onBook, onLeaderboard, onUpgrade,
               ) : (
                 <span style={{ display: 'flex', gap: 6 }}>
                   <input
-                    style={{ font: '700 13px var(--mono)', border: 'var(--bd)', borderRadius: 8, padding: '4px 10px', outline: 'none' }}
+                    style={{ font: '700 13px var(--mono)', border: 'var(--bd)', borderRadius: 8, padding: '4px 10px', outline: 'none', fontSize: 16, touchAction: 'manipulation' }}
                     value={nameInput}
                     maxLength={30}
+                    inputmode="text"
+                    autocorrect="off"
+                    autocapitalize="words"
+                    spellcheck={false}
                     onInput={e => setNameInput(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') handleSaveName(); if (e.key === 'Escape') setEditingName(false); }}
                     autoFocus
