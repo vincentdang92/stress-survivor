@@ -605,7 +605,83 @@ img { max-width: 100%; display: block; }
   .combo-display { font-size: 28px; }
   .act { width: 64px; height: 64px; }
   .act.rage-btn { width: 80px; height: 80px; }
-  .loadout { max-width: calc(100% - 190px); }
+
+  /* Level-up overlay → bottom sheet trên mobile */
+  .ov {
+    align-items: flex-end;    /* anchor to bottom */
+    padding: 0;
+    background: rgba(29, 27, 46, .55);  /* tối hơn để focus card */
+    backdrop-filter: blur(2px);
+  }
+  .lvbox {
+    width: 100%;
+    background: var(--paper);
+    border-radius: 20px 20px 0 0;
+    border-top: 3px solid var(--ink);
+    box-shadow: 0 -4px 0 var(--ink);
+    padding: 16px 16px 24px;
+    max-height: 75vh;
+    overflow-y: auto;
+    gap: 10px;
+  }
+  .lvbox h2 { font-size: clamp(24px, 6vw, 34px); }
+  /* Cards horizontal scroll on mobile (không che game) */
+  .choices {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 10px;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+  .choices::-webkit-scrollbar { display: none; }
+  .card {
+    flex: none;
+    width: 200px; /* fixed width per card */
+    grid-template-columns: 1fr; /* reset mobile card grid */
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .card > * { grid-column: auto; } /* reset */
+  .card .ctop { grid-column: auto; grid-row: auto; flex-direction: row; }
+  .card:hover, .card:nth-child(2):hover { transform: none; }
+
+  /* Loadout → horizontal scroll strip above action buttons (không che game) */
+  .loadout {
+    left: 0;
+    right: 0;
+    max-width: 100%;
+    bottom: 96px; /* clearance for act buttons: 64px height + 16px bottom + 16px margin */
+    display: block;
+    position: relative; /* for ::after */
+  }
+  .loadout::after {
+    content: '';
+    position: absolute;
+    right: 0; top: 0; bottom: 0;
+    width: 36px;
+    background: linear-gradient(to right, transparent, rgba(231,237,245,.85));
+    pointer-events: none;
+  }
+  .chips {
+    flex-wrap: nowrap;          /* single row */
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;      /* hide scrollbar */
+    padding: 2px 8px;
+    pointer-events: auto;       /* allow swipe-scroll */
+  }
+  .chips::-webkit-scrollbar { display: none; }
+  .chip {
+    flex: none;                 /* don't shrink */
+    font-size: 10px;
+    padding: 2px 7px;
+    background: rgba(255,255,255,.9); /* slight transparency */
+  }
+  .chip.syn { font-size: 10.5px; }
   .book-grid { grid-template-columns: repeat(2, 1fr); }
   .bcard img { width: 80px; height: 80px; }
 }
