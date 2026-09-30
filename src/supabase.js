@@ -72,8 +72,17 @@ export async function signInWithEmail(email, password) {
   if (!supabase) return { error: 'Offline — chưa cấu hình Supabase' };
   try {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    return { user: data?.user, error: _errMsg(error) };
-  } catch (e) { return { error: _errMsg(e) }; }
+    if (error) {
+      const msg = (error.message || '').toLowerCase();
+      // Email chưa xác nhận — Supabase trả "Email not confirmed"
+      if (msg.includes('not confirmed') || msg.includes('email not confirmed')) {
+        return { error: 'EMAIL_NOT_CONFIRMED' };
+      }
+      // Invalid credentials
+      return { error: 'WRONG_PASSWORD' };
+    }
+    return { user: data?.user, error: null };
+  } catch (e) { return { error: e.message || 'Lỗi không xác định' }; }
 }
 
 /** Đăng ký tài khoản mới bằng email + password */
@@ -81,15 +90,36 @@ export async function signUpWithEmail(email, password) {
   if (!supabase) return { error: 'Offline — chưa cấu hình Supabase' };
   try {
     const { data, error } = await supabase.auth.signUp({ email, password });
-    const errMsg = _errMsg(error);
-    if (errMsg === '__ENUM_PROTECT__') {
-      // Supabase email enumeration protection: email đã tồn tại
-      return { error: 'EMAIL_EXISTS', user: null };
+
+    if (error) {
+      const msg = (error.message || '').toLowerCase();
+      const status = error.status || 0;
+      // Email đã tồn tại — Supabase 422 hoặc message chứa "already registered"
+      if (status === 422 || msg.includes('already') || msg.includes('registered')) {
+        return { error: 'EMAIL_EXISTS' };
+      }
+      // Email không hợp lệ
+      if (msg.includes('valid') || msg.includes('format') || msg.includes('email')) {
+        return { error: 'Email không hợp lệ.' };
+      }
+      return { error: error.message || 'Đăng ký thất bại' };
     }
-    if (errMsg) return { error: errMsg };
-    // needConfirm = true khi cần xác nhận email (chưa có session ngay)
-    return { user: data?.user, error: null, needConfirm: !data?.session };
-  } catch (e) { return { error: _errMsg(e) }; }
+
+    // Không có user → Supabase enumeration protection đang bật
+    // Không thể phân biệt "email tồn tại" vs "signup thành công, chờ confirm"
+    // → Luôn show "kiểm tra email" để tránh confuse
+    if (!data?.user) {
+      return { error: null, needConfirm: true };
+    }
+
+    // Có session ngay → email confirmation bị tắt → đăng nhập luôn
+    if (data.session) {
+      return { user: data.user, error: null, needConfirm: false };
+    }
+
+    // Có user, không có session → cần xác nhận email
+    return { user: data.user, error: null, needConfirm: true };
+  } catch (e) { return { error: e.message || 'Lỗi không xác định' }; }
 }
 
 /**

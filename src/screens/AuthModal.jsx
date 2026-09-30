@@ -54,7 +54,6 @@ function AuthForm({ initialLinkMode, onCloseRef, onAuthSuccessRef, debug }) {
     const email    = (emailRef.current?.value    || '').trim();
     const password = (passwordRef.current?.value || '');
     const mode     = modeRef.current;
-    // Read callbacks from refs — no dependency on changing props
     const onClose       = onCloseRef.current;
     const onAuthSuccess = onAuthSuccessRef.current;
 
@@ -71,11 +70,8 @@ function AuthForm({ initialLinkMode, onCloseRef, onAuthSuccessRef, debug }) {
         const res = await upgradeAnonToEmail(email, password);
         dbg('upgradeAnonToEmail:', res);
         setRawLog(JSON.stringify(res, null, 2));
-        if (res.error && /session|missing/i.test(res.error)) {
-          const res2 = await signUpWithEmail(email, password);
-          dbg('signUp fallback:', res2);
-          setRawLog(JSON.stringify(res2, null, 2));
-          _handleSignupResult(res2, showMsg, switchMode, onClose);
+        if (res.error === 'EMAIL_EXISTS') {
+          showMsg('📭 Email này đã có tài khoản. Hãy chuyển sang Đăng nhập.', 'err');
         } else if (res.error) {
           showMsg('Lỗi: ' + res.error, 'err');
         } else {
@@ -87,8 +83,12 @@ function AuthForm({ initialLinkMode, onCloseRef, onAuthSuccessRef, debug }) {
         const res = await signInWithEmail(email, password);
         dbg('signIn:', res);
         setRawLog(JSON.stringify(res, null, 2));
-        if (res.error) {
-          showMsg('Sai email hoặc mật khẩu.', 'err');
+        if (res.error === 'EMAIL_NOT_CONFIRMED') {
+          showMsg('📧 Email chưa được xác nhận. Vui lòng kiểm tra hộp thư và click link xác nhận.', 'err');
+        } else if (res.error === 'WRONG_PASSWORD') {
+          showMsg('❌ Sai email hoặc mật khẩu.', 'err');
+        } else if (res.error) {
+          showMsg('Lỗi: ' + res.error, 'err');
         } else {
           await pullPlayerData();
           showMsg('✅ Đăng nhập thành công!', 'ok');
@@ -100,7 +100,19 @@ function AuthForm({ initialLinkMode, onCloseRef, onAuthSuccessRef, debug }) {
         const res = await signUpWithEmail(email, password);
         dbg('signUp:', res);
         setRawLog(JSON.stringify(res, null, 2));
-        _handleSignupResult(res, showMsg, switchMode, onClose);
+        if (res.error === 'EMAIL_EXISTS') {
+          // Không auto-switch — chỉ thông báo để user tự chọn
+          showMsg('📭 Email này đã có tài khoản. Chuyển sang tab Đăng nhập để tiếp tục.', 'err');
+        } else if (res.error) {
+          showMsg('Lỗi: ' + res.error, 'err');
+        } else if (res.needConfirm) {
+          showMsg('📧 Kiểm tra email để xác nhận tài khoản! Sau khi xác nhận, quay lại đây và Đăng nhập.', 'ok');
+        } else {
+          // Đăng ký + đăng nhập luôn (email confirmation tắt)
+          showMsg('✅ Tài khoản tạo thành công!', 'ok');
+          onAuthSuccess?.(res.user);
+          setTimeout(onClose, 1500);
+        }
       }
     } catch (err) {
       const msg = err?.message || String(err);
@@ -181,19 +193,6 @@ function AuthForm({ initialLinkMode, onCloseRef, onAuthSuccessRef, debug }) {
   );
 }
 
-function _handleSignupResult(res, showMsg, switchMode, onClose) {
-  if (res.error === 'EMAIL_EXISTS') {
-    showMsg('📭 Email đã được đăng ký. Chuyển sang Đăng nhập...', 'err');
-    setTimeout(() => switchMode('login'), 1800);
-  } else if (res.error) {
-    showMsg('Lỗi: ' + res.error, 'err');
-  } else if (res.needConfirm) {
-    showMsg('📧 Kiểm tra email để xác nhận tài khoản!', 'ok');
-  } else {
-    showMsg('✅ Tài khoản tạo thành công!', 'ok');
-    setTimeout(onClose, 1500);
-  }
-}
 
 // ── AuthModal — rendered via Portal into document.body (isolated from App re-renders) ──
 export function AuthModal({ onClose, onAuthSuccess }) {
