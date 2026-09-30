@@ -101,8 +101,9 @@ function AuthForm({ initialLinkMode, onCloseRef, onAuthSuccessRef, debug }) {
         dbg('signUp:', res);
         setRawLog(JSON.stringify(res, null, 2));
         if (res.error === 'EMAIL_EXISTS') {
-          // Không auto-switch — chỉ thông báo để user tự chọn
-          showMsg('📭 Email này đã có tài khoản. Chuyển sang tab Đăng nhập để tiếp tục.', 'err');
+          // {} error từ Supabase = email có thể đã tồn tại (hoặc enumeration protection)
+          // Không auto-switch — cho user tự quyết
+          showMsg('📭 Email này có thể đã được đăng ký. Thử tab Đăng nhập, hoặc dùng email khác.', 'err');
         } else if (res.error) {
           showMsg('Lỗi: ' + res.error, 'err');
         } else if (res.needConfirm) {

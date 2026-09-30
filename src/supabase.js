@@ -92,22 +92,31 @@ export async function signUpWithEmail(email, password) {
     const { data, error } = await supabase.auth.signUp({ email, password });
 
     if (error) {
-      const msg = (error.message || '').toLowerCase();
+      const rawMsg = error.message || '';
+      const msg = rawMsg.toLowerCase().trim();
       const status = error.status || 0;
-      // Email đã tồn tại — Supabase 422 hoặc message chứa "already registered"
+
+      // Supabase Email Enumeration Protection: trả về "{}" hoặc chuỗi rỗng
+      // khi email đã tồn tại (để không lộ thông tin). Không thể phân biệt
+      // với lỗi khác → show EMAIL_EXISTS
+      if (rawMsg === '{}' || rawMsg === '' || rawMsg === 'null' || rawMsg === 'undefined') {
+        return { error: 'EMAIL_EXISTS' };
+      }
+
+      // Email đã tồn tại — Supabase 422 hoặc message rõ ràng
       if (status === 422 || msg.includes('already') || msg.includes('registered')) {
         return { error: 'EMAIL_EXISTS' };
       }
+
       // Email không hợp lệ
-      if (msg.includes('valid') || msg.includes('format') || msg.includes('email')) {
+      if (msg.includes('valid') || msg.includes('format') || msg.includes('invalid email')) {
         return { error: 'Email không hợp lệ.' };
       }
-      return { error: error.message || 'Đăng ký thất bại' };
+
+      return { error: rawMsg || 'Đăng ký thất bại' };
     }
 
-    // Không có user → Supabase enumeration protection đang bật
-    // Không thể phân biệt "email tồn tại" vs "signup thành công, chờ confirm"
-    // → Luôn show "kiểm tra email" để tránh confuse
+    // Không có user → enumeration protection masking (cả 2 case đều giống nhau)
     if (!data?.user) {
       return { error: null, needConfirm: true };
     }
