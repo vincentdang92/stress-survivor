@@ -52,3 +52,19 @@ export function stopBattle() {
   if (!phaserInstance) return;
   try { phaserInstance.scene.stop('BattleScene'); } catch (e) { /* ignore */ }
 }
+
+/** Tạm dừng Phaser loop — gọi khi mở modal để giải phóng main thread */
+export function pauseGame() {
+  if (!phaserInstance) return;
+  try { phaserInstance.loop?.sleep(); } catch (e) {
+    try { phaserInstance.pause(); } catch (_) {}
+  }
+}
+
+/** Tiếp tục Phaser loop — gọi khi đóng modal */
+export function resumeGame() {
+  if (!phaserInstance) return;
+  try { phaserInstance.loop?.wake(); } catch (e) {
+    try { phaserInstance.resume(); } catch (_) {}
+  }
+}

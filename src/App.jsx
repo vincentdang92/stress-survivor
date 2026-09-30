@@ -1,7 +1,7 @@
 /** App.jsx — main Preact app with state machine + Supabase integration */
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import { bus } from './bus.js';
-import { PhaserGame, startBattle, stopBattle } from './game/PhaserGame.jsx';
+import { PhaserGame, startBattle, stopBattle, pauseGame, resumeGame } from './game/PhaserGame.jsx';
 import { HUD, Banner, MashOverlay } from './hud/HUD.jsx';
 import { LevelUpOverlay } from './hud/LevelUpOverlay.jsx';
 import { PauseOverlay } from './hud/PauseOverlay.jsx';
@@ -24,6 +24,12 @@ export function App() {
   const [showAuth, setShowAuth] = useState(false);
   const phaserReadyRef = useRef(false);
   const pendingBattle = useRef(null);
+
+  // Pause Phaser loop khi mở modal → giải phóng main thread cho input
+  useEffect(() => {
+    if (showAuth) pauseGame();
+    else resumeGame();
+  }, [showAuth]);
 
   // Init auth + player on mount
   useEffect(() => {

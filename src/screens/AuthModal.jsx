@@ -83,9 +83,18 @@ function AuthForm({ isLinkMode, onClose, onAuthSuccess, debug }) {
         const res = await signUpWithEmail(email, password);
         dbg('signUpWithEmail result:', res);
         setRawLog(JSON.stringify(res, null, 2));
-        if (res.error)            showMsg('Lỗi: ' + res.error, 'err');
-        else if (res.needConfirm) showMsg('📧 Kiểm tra email để xác nhận tài khoản!', 'ok');
-        else                     { showMsg('✅ Tài khoản tạo thành công!', 'ok'); setTimeout(onClose, 1500); }
+        if (res.error === 'EMAIL_EXISTS') {
+          // Email đã tồn tại — Supabase enumeration protection mask lỗi
+          showMsg('📭 Email này đã được đăng ký. Hãy chuyển sang Đăng nhập!', 'err');
+          setTimeout(() => switchMode('login'), 2000);
+        } else if (res.error) {
+          showMsg('Lỗi: ' + res.error, 'err');
+        } else if (res.needConfirm) {
+          showMsg('📧 Kiểm tra email để xác nhận tài khoản!', 'ok');
+        } else {
+          showMsg('✅ Tài khoản tạo thành công!', 'ok');
+          setTimeout(onClose, 1500);
+        }
       }
     } catch (err) {
       const errStr = err?.message || JSON.stringify(err) || 'Unknown';

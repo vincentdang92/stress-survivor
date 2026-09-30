@@ -50,14 +50,20 @@ export async function initAuth() {
 /** Helper: extract readable message từ bất kỳ dạng error nào */
 function _errMsg(e) {
   if (!e) return null;
-  if (typeof e === 'string') return e;
-  // Supabase error có thể là object với nhiều dạng khác nhau
-  const msg = e.message || e.error_description || e.msg || e.code;
-  if (msg && typeof msg === 'string') return msg;
-  // Fallback: thử stringify nhưng tránh "{}"
+  if (typeof e === 'string') {
+    // Supabase enumeration protection trả về "{}" làm message
+    if (e === '{}' || e === '' || e === 'null') return '__ENUM_PROTECT__';
+    return e;
+  }
+  const raw = e.message || e.error_description || e.msg || e.code;
+  if (raw && typeof raw === 'string') {
+    if (raw === '{}' || raw === '' || raw === 'null') return '__ENUM_PROTECT__';
+    return raw;
+  }
   try {
     const s = JSON.stringify(e);
-    return s === '{}' ? 'Lỗi kết nối Supabase' : s;
+    if (s === '{}' || s === '' || s === 'null') return '__ENUM_PROTECT__';
+    return s;
   } catch { return 'Lỗi không xác định'; }
 }
 
@@ -75,7 +81,12 @@ export async function signUpWithEmail(email, password) {
   if (!supabase) return { error: 'Offline — chưa cấu hình Supabase' };
   try {
     const { data, error } = await supabase.auth.signUp({ email, password });
-    if (error) return { error: _errMsg(error) };
+    const errMsg = _errMsg(error);
+    if (errMsg === '__ENUM_PROTECT__') {
+      // Supabase email enumeration protection: email đã tồn tại
+      return { error: 'EMAIL_EXISTS', user: null };
+    }
+    if (errMsg) return { error: errMsg };
     // needConfirm = true khi cần xác nhận email (chưa có session ngay)
     return { user: data?.user, error: null, needConfirm: !data?.session };
   } catch (e) { return { error: _errMsg(e) }; }
