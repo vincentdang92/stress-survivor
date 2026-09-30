@@ -27,35 +27,50 @@ export function App() {
 
   // ── GLOBAL INPUT FOCUS HANDLER ────────────────────────────────────────────
   // Pause Phaser + unlock touch/select whenever ANY input in the app has focus.
-  // Covers: auth modal, name edit, leaderboard search — không cần biết screen nào.
+  // Uses BOTH touchstart (early, reliable in WebViews) + focusin (desktop fallback).
   useEffect(() => {
-    const onFocusIn = (e) => {
-      if (e.target.matches('input, textarea, select, [contenteditable]')) {
+    const INPUT_SELECTOR = 'input, textarea, select, [contenteditable]';
+
+    // Called as early as possible — on touchstart on an input (before focus event)
+    const onTouchStart = (e) => {
+      if (e.target.matches(INPUT_SELECTOR)) {
         pauseGame();
         document.body.classList.add('auth-open');
       }
     };
+
+    // Fallback for desktop (no touch)
+    const onFocusIn = (e) => {
+      if (e.target.matches(INPUT_SELECTOR)) {
+        pauseGame();
+        document.body.classList.add('auth-open');
+      }
+    };
+
     const onFocusOut = (e) => {
-      if (e.target.matches('input, textarea, select, [contenteditable]')) {
-        // Dùng requestAnimationFrame để check sau khi focus chuyển sang element mới
+      if (e.target.matches(INPUT_SELECTOR)) {
         requestAnimationFrame(() => {
           const active = document.activeElement;
-          if (!active || !active.matches('input, textarea, select, [contenteditable]')) {
+          if (!active || !active.matches(INPUT_SELECTOR)) {
             resumeGame();
             document.body.classList.remove('auth-open');
           }
         });
       }
     };
+
+    // passive: true so we don't block scroll, but we get the event early
+    document.addEventListener('touchstart', onTouchStart, { passive: true, capture: true });
     document.addEventListener('focusin', onFocusIn, true);
     document.addEventListener('focusout', onFocusOut, true);
     return () => {
+      document.removeEventListener('touchstart', onTouchStart, { capture: true });
       document.removeEventListener('focusin', onFocusIn, true);
       document.removeEventListener('focusout', onFocusOut, true);
     };
   }, []);
 
-  // showAuth effect: vẫn giữ để pause Phaser khi modal mở (trước khi user tap input)
+  // showAuth effect: eagerly pause before user even taps input
   useEffect(() => {
     if (showAuth) { pauseGame(); document.body.classList.add('auth-open'); }
     else if (!document.activeElement?.matches('input, textarea')) {

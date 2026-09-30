@@ -13,8 +13,9 @@ export function PhaserGame({ onReady, visible = false }) {
 
     phaserInstance = createPhaserGame(containerRef.current);
 
-    // Wait for Phaser boot complete before signaling ready
     phaserInstance.events.once('ready', () => {
+      // Start in fully paused state — keyboard listener off until battle
+      _stopKeyboard();
       if (onReady) onReady(phaserInstance);
     });
 
@@ -38,69 +39,79 @@ export function PhaserGame({ onReady, visible = false }) {
   );
 }
 
-/** Boost Phaser lên 60fps + enable input — gọi khi bắt đầu battle */
+// ── Internal helpers ─────────────────────────────────────────────────────────
+
+function _stopKeyboard() {
+  // Remove Phaser's keydown/keyup listeners from window
+  // This prevents ANY Phaser keyboard processing while UI is shown
+  try { phaserInstance?.input?.keyboard?.stopListeners?.(); } catch {}
+}
+
+function _startKeyboard() {
+  try { phaserInstance?.input?.keyboard?.startListeners?.(); } catch {}
+}
+
+// ── Public API ───────────────────────────────────────────────────────────────
+
+/** Boost Phaser lên 60fps + enable keyboard — gọi khi bắt đầu battle */
 export function startBattle(cls, seed, trial = false) {
   if (!phaserInstance) return;
-  // Boost FPS + enable input cho battle
   try {
-    if (phaserInstance.loop) { phaserInstance.loop.targetFps = 60; phaserInstance.loop.wake?.(); }
-    if (phaserInstance.input) phaserInstance.input.enabled = true;
+    // Wake loop to 60fps
+    if (phaserInstance.loop.running === false) phaserInstance.loop.wake();
+    phaserInstance.loop.targetFps = 60;
+    // Re-enable input + keyboard for battle
+    phaserInstance.input.enabled = true;
+    _startKeyboard();
     // Show canvas
     const c = phaserInstance.canvas;
     if (c) { c.style.display = ''; c.style.pointerEvents = 'auto'; }
+    // Unpause game logic
+    phaserInstance.isPaused = false;
   } catch {}
   if (phaserInstance.scene.isActive('BattleScene')) phaserInstance.scene.stop('BattleScene');
   phaserInstance.scene.start('BattleScene', { cls, seed, trial });
 }
 
-/** Throttle về 1fps + disable input khi rời battle */
+/** Throttle + disable input khi rời battle */
 export function stopBattle() {
   if (!phaserInstance) return;
   try { phaserInstance.scene.stop('BattleScene'); } catch {}
-  try {
-    if (phaserInstance.loop) phaserInstance.loop.targetFps = 1;
-    // Disable Phaser input khi không battle
-    if (phaserInstance.input) phaserInstance.input.enabled = false;
-    // Hide canvas element hoàn toàn
-    const c = phaserInstance.canvas;
-    if (c) { c.style.display = 'none'; }
-  } catch {}
+  pauseGame(); // full pause when leaving battle
 }
 
 /**
- * Dừng Phaser hoàn toàn khi mở modal UI:
- * 1. Sleep game loop  2. Disable input  3. Hide canvas  4. Stop scale resize listener
+ * Full pause: sleep loop + disable all input + hide canvas + remove keyboard listener
+ * Called when ANY input gets focus (via global focusin handler in App.jsx)
  */
 export function pauseGame() {
   if (!phaserInstance) return;
   try {
-    const loop = phaserInstance.loop;
-    if (typeof loop?.sleep === 'function') loop.sleep();
-    else if (loop) loop.targetFps = 1;
-
-    if (phaserInstance.input) phaserInstance.input.enabled = false;
-
+    // 1. Pause game logic (skip step() even if loop runs)
+    phaserInstance.isPaused = true;
+    // 2. Sleep the RAF loop entirely
+    if (phaserInstance.loop.running !== false) phaserInstance.loop.sleep();
+    // 3. Disable input manager (touch/mouse)
+    phaserInstance.input.enabled = false;
+    // 4. Remove keydown/keyup from window — definitive keyboard fix
+    _stopKeyboard();
+    // 5. Hide canvas
     const c = phaserInstance.canvas;
     if (c) { c.style.display = 'none'; }
-
-    // Stop scale manager resize listener — khi keyboard mở/đóng trên mobile
-    // window resize event sẽ không wake Phaser nữa
-    if (phaserInstance.scale) phaserInstance.scale.stopListeners?.();
   } catch (e) { console.warn('[Phaser] pauseGame:', e.message); }
 }
 
-/** Wake Phaser loop khi đóng modal UI */
+/** Resume to idle (1fps, no keyboard) after modal closes */
 export function resumeGame() {
   if (!phaserInstance) return;
   try {
-    const loop = phaserInstance.loop;
-    if (typeof loop?.wake === 'function') loop.wake();
-    if (loop) loop.targetFps = 1;
-
+    phaserInstance.isPaused = false;
+    // Wake at 1fps idle — keyboard stays OFF until startBattle
+    phaserInstance.loop.wake();
+    phaserInstance.loop.targetFps = 1;
+    phaserInstance.input.enabled = false; // keep input disabled in menu
+    // Show canvas (at 1fps, hidden via visibility)
     const c = phaserInstance.canvas;
     if (c) { c.style.display = ''; }
-
-    // Re-enable scale manager
-    if (phaserInstance.scale) phaserInstance.scale.startListeners?.();
   } catch (e) { console.warn('[Phaser] resumeGame:', e.message); }
 }
