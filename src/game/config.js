@@ -13,12 +13,12 @@ export function createPhaserGame(parent) {
       mode: Phaser.Scale.RESIZE,
       autoCenter: Phaser.Scale.CENTER_BOTH,
     },
-    // NO physics needed — we do manual movement
+    // Chạy ở 1fps khi idle — startBattle() sẽ boost lên 60fps
+    fps: { min: 1, target: 1, forceSetTimeOut: false, deltaHistory: 10 },
     scene: [BattleScene],
     disableContextMenu: true,
     input: { activePointers: 4 },
     render: { pixelArt: false, antialias: true },
-    // Don't auto-start first scene; we call startBattle manually
     autoStart: false,
   });
 }

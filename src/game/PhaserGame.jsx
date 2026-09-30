@@ -39,32 +39,41 @@ export function PhaserGame({ onReady, visible = false }) {
   );
 }
 
-/** Start a battle in Phaser */
+/** Boost Phaser lên 60fps — gọi khi bắt đầu battle */
 export function startBattle(cls, seed, trial = false) {
   if (!phaserInstance) return;
-  if (phaserInstance.scene.isActive('BattleScene')) {
-    phaserInstance.scene.stop('BattleScene');
-  }
+  // Boost FPS cho battle
+  try { if (phaserInstance.loop) { phaserInstance.loop.targetFps = 60; phaserInstance.loop.wake?.(); } } catch {}
+  if (phaserInstance.scene.isActive('BattleScene')) phaserInstance.scene.stop('BattleScene');
   phaserInstance.scene.start('BattleScene', { cls, seed, trial });
 }
 
+/** Throttle về 1fps khi rời battle */
 export function stopBattle() {
   if (!phaserInstance) return;
-  try { phaserInstance.scene.stop('BattleScene'); } catch (e) { /* ignore */ }
+  try { phaserInstance.scene.stop('BattleScene'); } catch {}
+  try { if (phaserInstance.loop) phaserInstance.loop.targetFps = 1; } catch {}
 }
 
-/** Tạm dừng Phaser loop — gọi khi mở modal để giải phóng main thread */
+/** Sleep Phaser loop khi mở modal UI */
 export function pauseGame() {
   if (!phaserInstance) return;
-  try { phaserInstance.loop?.sleep(); } catch (e) {
-    try { phaserInstance.pause(); } catch (_) {}
-  }
+  try {
+    const loop = phaserInstance.loop;
+    if (typeof loop?.sleep === 'function') { loop.sleep(); }
+    else if (loop) { loop.targetFps = 1; }
+    else { phaserInstance.pause?.(); }
+  } catch (e) { console.warn('[Phaser] pauseGame:', e.message); }
 }
 
-/** Tiếp tục Phaser loop — gọi khi đóng modal */
+/** Wake Phaser loop khi đóng modal UI */
 export function resumeGame() {
   if (!phaserInstance) return;
-  try { phaserInstance.loop?.wake(); } catch (e) {
-    try { phaserInstance.resume(); } catch (_) {}
-  }
+  try {
+    const loop = phaserInstance.loop;
+    if (typeof loop?.wake === 'function') { loop.wake(); }
+    // Keep at 1fps idle after wake
+    if (loop) loop.targetFps = 1;
+    else { phaserInstance.resume?.(); }
+  } catch (e) { console.warn('[Phaser] resumeGame:', e.message); }
 }
