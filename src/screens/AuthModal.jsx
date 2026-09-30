@@ -206,6 +206,13 @@ export function AuthModal({ onClose, onAuthSuccess }) {
   const onAuthSuccessRef = useRef(onAuthSuccess);
   useEffect(() => { onCloseRef.current = onClose; onAuthSuccessRef.current = onAuthSuccess; });
 
+  // CRITICAL: thêm class auth-open vào body khi modal mở
+  // → override body { touch-action: none; user-select: none } để mobile keyboard hoạt động
+  useEffect(() => {
+    document.body.classList.add('auth-open');
+    return () => document.body.classList.remove('auth-open');
+  }, []);
+
   // Listen only for actual auth changes (not initial session load)
   useEffect(() => {
     let cancelled = false;

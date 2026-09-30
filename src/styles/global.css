@@ -35,6 +35,25 @@ body {
   -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
+/* Khi auth modal mở — override game body rules để keyboard mobile hoạt động */
+body.auth-open {
+  touch-action: auto !important;
+}
+body.auth-open .auth-overlay,
+body.auth-open .auth-overlay * {
+  touch-action: manipulation !important;
+  user-select: auto !important;
+  -webkit-user-select: auto !important;
+}
+body.auth-open .auth-overlay input,
+body.auth-open .auth-overlay textarea {
+  touch-action: manipulation !important;
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  pointer-events: auto !important;
+  /* font-size >= 16px ngăn iOS auto-zoom */
+  font-size: 16px !important;
+}
 button { font: inherit; color: inherit; cursor: pointer; border: none; background: none; }
 button:focus-visible { outline: 3px solid var(--grape); outline-offset: 3px; }
 img { max-width: 100%; display: block; }
