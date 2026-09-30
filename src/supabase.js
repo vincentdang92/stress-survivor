@@ -96,11 +96,10 @@ export async function signUpWithEmail(email, password) {
       const msg = rawMsg.toLowerCase().trim();
       const status = error.status || 0;
 
-      // Supabase Email Enumeration Protection: trả về "{}" hoặc chuỗi rỗng
-      // khi email đã tồn tại (để không lộ thông tin). Không thể phân biệt
-      // với lỗi khác → show EMAIL_EXISTS
+      // Supabase trả "{}" → thường do: email đã tồn tại (enumeration protection)
+      // hoặc SMTP rate limit (free tier giới hạn ~3 email/giờ)
       if (rawMsg === '{}' || rawMsg === '' || rawMsg === 'null' || rawMsg === 'undefined') {
-        return { error: 'EMAIL_EXISTS' };
+        return { error: 'AMBIGUOUS' };
       }
 
       // Email đã tồn tại — Supabase 422 hoặc message rõ ràng
