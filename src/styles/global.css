@@ -651,12 +651,12 @@ img { max-width: 100%; display: block; }
 
   /* Loadout → horizontal scroll strip above action buttons (không che game) */
   .loadout {
+    position: absolute; /* giữ absolute positioning trong HUD canvas */
     left: 0;
     right: 0;
     max-width: 100%;
-    bottom: 96px; /* clearance for act buttons: 64px height + 16px bottom + 16px margin */
+    bottom: 96px; /* clearance: 64px act + 16px gap + 16px margin */
     display: block;
-    position: relative; /* for ::after */
   }
   .loadout::after {
     content: '';
