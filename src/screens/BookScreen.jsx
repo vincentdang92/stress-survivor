@@ -19,6 +19,36 @@ const ENEMY_LABELS = {
 const CARD_BY_ID = Object.fromEntries(CARDS.map(c => [c.id, c]));
 
 function CharacterDetail({ cls, portrait }) {
+  // Locked / soon character → teaser only
+  if (cls.soon) {
+    return (
+      <div class="book-detail">
+        <div class="book-detail-head" style={{ filter: 'grayscale(1)', opacity: .6 }}>
+          <span style={{ fontSize: 56 }}>🔒</span>
+          <div>
+            <h3 style={{ margin: '0 0 4px', font: '800 22px var(--display)' }}>{cls.name}</h3>
+            <div style={{ font: '400 13px/1.5 var(--body)', color: '#666' }}>{cls.line}</div>
+          </div>
+        </div>
+        <div class="book-detail-section" style={{ textAlign: 'center', padding: '20px 16px' }}>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>🚧</div>
+          <div style={{ font: '700 14px var(--display)', marginBottom: 6 }}>Đang phát triển</div>
+          {cls.lore && (
+            <div style={{ font: '400 12px/1.6 var(--body)', color: '#888', fontStyle: 'italic' }}>
+              {cls.lore}
+            </div>
+          )}
+          {cls.passive && (
+            <div style={{ marginTop: 12, padding: '8px 12px', background: 'var(--paper)', border: 'var(--bd)', borderRadius: 8 }}>
+              <div style={{ font: '700 11px var(--display)', color: 'var(--grape)', marginBottom: 3 }}>Passive: {cls.passive}</div>
+              <div style={{ font: '400 11px var(--body)', color: '#666' }}>{cls.pdesc}</div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   const weapons = (cls.weapons || []).map(id => CARD_BY_ID[id]).filter(Boolean);
   const passives = (cls.passives || []).map(id => CARD_BY_ID[id]).filter(Boolean);
   return (
@@ -135,7 +165,7 @@ export function BookScreen({ onClose }) {
                   <div
                     key={key}
                     class={`book-char-item${isSelected ? ' selected' : ''}${!isOwned ? ' locked' : ''}`}
-                    onClick={() => isOwned && setSelChar(key)}
+                    onClick={() => setSelChar(key)}
                   >
                     {portraits[key]
                       ? <img src={portraits[key]} alt={cls.name} style={{ width: 40, height: 40 }} />

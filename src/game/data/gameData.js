@@ -164,17 +164,33 @@ export const CLASSES = {
     passives: ['rubber_duck', 'glasses', 'espresso'],
     soon: false,
   },
+  // ── Sắp ra — đang phát triển ───────────────────────────────────────────
   manager: {
     name: 'Manager', line: 'Một con dấu, trăm việc xong.',
-    start: 'plane', bias: 'office',
-    passive: 'Phê Duyệt', pdesc: 'Địch đang mang dấu nhận thêm 15% sát thương.',
-    tap: 'Đóng dấu DUYỆT / TỪ CHỐI tại điểm chạm. Đủ 3 dấu thì địch nổ, vụ nổ đóng thêm dấu lên địch xung quanh.',
-    soon: false,
+    passive: 'Phê Duyệt', pdesc: 'Địch mang dấu nhận +15% sát thương.',
+    lore: 'Unlock: Thắng 3 ván liên tiếp.',
+    soon: true,
   },
-  designer:  { name: 'Designer', line: 'Dời logo sang trái 1px nữa thôi.', soon: true },
-  sales:     { name: 'Sales',    line: 'Chốt đơn cả trong mơ.',            soon: true },
-  chef:      { name: 'Chef',     line: 'Nóng hơn cả bếp là deadline.',      soon: true },
-  driver:    { name: 'Driver',   line: 'Còi to hơn mọi cuộc gọi.',          soon: true },
+  designer: {
+    name: 'Designer', line: 'Dời logo sang trái 1px nữa thôi.',
+    lore: 'Unlock: Đạt combo × 30 trong 1 ván.',
+    soon: true,
+  },
+  sales: {
+    name: 'Sales', line: 'Chốt đơn cả trong mơ.',
+    lore: 'Unlock: Tích lũy 2000 vàng.',
+    soon: true,
+  },
+  chef: {
+    name: 'Chef', line: 'Nóng hơn cả bếp là deadline.',
+    lore: 'Unlock: Giết 500 địch tổng cộng.',
+    soon: true,
+  },
+  driver: {
+    name: 'Driver', line: 'Còi to hơn mọi cuộc gọi.',
+    lore: 'Unlock: Né thành công 300 lần.',
+    soon: true,
+  },
 };
 
 // ── EXP formula ──────────────────────────────────────────────────────────
