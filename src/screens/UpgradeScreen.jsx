@@ -32,12 +32,32 @@ export function addGold(amount) {
 export function getUpgradeStats() {
   const u = getUpgrades();
   return {
-    hpBonus:      u.hp            * 20,   // flat HP bonus
-    atkMul:       1 + u.atk       * 0.08, // damage multiplier
-    spdMul:       1 + u.spd       * 0.05, // speed multiplier
-    critBonus:    u.crit          * 0.04, // crit chance bonus
-    stressResist: u.stressResist  * 0.08, // reduce stress gain
+    hpBonus:      u.hp            * 20,
+    atkMul:       1 + u.atk       * 0.08,
+    spdMul:       1 + u.spd       * 0.05,
+    critBonus:    u.crit          * 0.04,
+    stressResist: u.stressResist  * 0.08,
   };
+}
+
+/**
+ * Returns upgrade tier 0-4 based on total upgrade points spent.
+ * Used to pick character portrait variant and in-game sprite.
+ *   0 Rookie:      0-4 pts   (fresh start)
+ *   1 Experienced: 5-9 pts   (+glasses +coffee)
+ *   2 Veteran:     10-19 pts (+hoodie +headphone)
+ *   3 Elite:       20-29 pts (+RGB keyboard +energy drink)
+ *   4 Legendary:   30+ pts   (+aura +crown)
+ */
+export function getUpgradeTier() {
+  const u = getUpgrades();
+  const total = (u.hp || 0) + (u.atk || 0) + (u.spd || 0) + (u.crit || 0)
+              + (u.stressResist || 0) + (u.dev_mouse || 0) + (u.dev_ide || 0) + (u.dev_compile || 0);
+  if (total >= 30) return 4;
+  if (total >= 20) return 3;
+  if (total >= 10) return 2;
+  if (total >= 5)  return 1;
+  return 0;
 }
 
 // ─── Stat definitions ────────────────────────────────────────────────────────

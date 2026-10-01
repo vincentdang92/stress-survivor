@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo, useRef } from 'preact/hooks';
 import { CLASSES } from '../game/data/gameData.js';
 import { portraitDataURL, enemyPortraitDataURL } from '../game/art/SpriteFactory.js';
 import { updateDisplayName } from '../supabase.js';
-
+import { TiltPortrait } from '../components/TiltPortrait.jsx';
+import { getUpgradeTier } from './UpgradeScreen.jsx';
 
 const PLAYABLE = Object.keys(CLASSES).filter(k => !CLASSES[k].soon);
 
@@ -44,10 +45,13 @@ export function MenuScreen({ onStart, onTrial, onBook, onLeaderboard, onUpgrade,
 
 
   useEffect(() => {
-    // Generate portraits
+    // Compute developer tier from upgrades
+    const tier = getUpgradeTier();
+
+    // Generate portraits — developer gets tier-specific portrait
     const pt = {};
     for (const cls of Object.keys(CLASSES)) {
-      try { pt[cls] = portraitDataURL(cls, 28); } catch { }
+      try { pt[cls] = portraitDataURL(cls, 28, cls === 'developer' ? tier : 0); } catch { }
     }
     setPortraits(pt);
 
@@ -64,7 +68,7 @@ export function MenuScreen({ onStart, onTrial, onBook, onLeaderboard, onUpgrade,
       saveProfile(p);
       setProfile(p);
     }
-  }, []);
+  }, [player?.id]); // re-run when player changes (includes return from UpgradeScreen)
 
   const canAddLine = profile.owned.length === 0 || profile.wins >= profile.owned.length;
   const cls = CLASSES[sel];
@@ -226,8 +230,32 @@ export function MenuScreen({ onStart, onTrial, onBook, onLeaderboard, onUpgrade,
             {cls && !cls.soon && (
               <div class="cdetail">
                 <div class="cd-head">
-                  {portraits[sel] && <img src={portraits[sel]} alt={cls.name} />}
-                  <div><b>{cls.name}</b><span>{cls.line}</span></div>
+                  {portraits[sel] && (
+                    sel === 'developer'
+                      ? <TiltPortrait src={portraitDataURL(sel, 42, getUpgradeTier())} size={72} maxDeg={16} />
+                      : <img src={portraits[sel]} alt={cls.name} />
+                  )}
+                  <div>
+                    <b>{cls.name}</b>
+                    <span>{cls.line}</span>
+                    {sel === 'developer' && (() => {
+                      const tier = getUpgradeTier();
+                      const TIER_NAMES = ['Rookie', 'Experienced', 'Veteran', 'Elite', 'Legendary'];
+                      const TIER_COLORS = ['#888', '#2EC4B6', '#7B5CFF', '#FF8A3D', '#FFD447'];
+                      return (
+                        <span style={{
+                          display: 'inline-block', marginTop: 4,
+                          font: '700 11px var(--mono)',
+                          color: TIER_COLORS[tier],
+                          background: 'var(--paper2)',
+                          border: `1.5px solid ${TIER_COLORS[tier]}`,
+                          borderRadius: 6, padding: '1px 7px',
+                        }}>
+                          {['⚪','🟢','🔵','🟠','⭐'][tier]} {TIER_NAMES[tier]}
+                        </span>
+                      );
+                    })()}
+                  </div>
                 </div>
                 {cls.passive && (
                   <>

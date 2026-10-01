@@ -12,6 +12,7 @@ import {
   nextXp, RARITY_WEIGHT, PUNS, scaledHp
 } from '../data/gameData.js';
 import { C } from '../art/colors.js';
+import { getUpgradeTier } from '../../screens/UpgradeScreen.jsx';
 
 const TAU = Math.PI * 2;
 const WORLD = 1200; // world half-extent (2400×2400 world)
@@ -61,7 +62,13 @@ export class BattleScene extends Phaser.Scene {
     const playerDisplayPx = PR * 3.45; // +15% from r*3
     const playerSpriteScale = playerDisplayPx / playerCanvasPx; // ≈ 0.317
 
-    this._playerSprite = this.add.image(this.player.x, this.player.y, `p_${this.cls}_0`);
+    // Player sprite — developer uses tier-specific texture
+    const devTier = this.cls === 'developer' ? getUpgradeTier() : 0;
+    this._devTier = devTier; // cache for rage swap
+    const initSpriteKey = this.cls === 'developer'
+      ? `p_developer_${devTier}_0`
+      : `p_${this.cls}_0`;
+    this._playerSprite = this.add.image(this.player.x, this.player.y, initSpriteKey);
     this._playerSprite.setScale(playerSpriteScale).setDepth(15);
 
 
@@ -1462,7 +1469,9 @@ export class BattleScene extends Phaser.Scene {
     if (this._playerSprite) {
       const p = this.player;
       const rage = p.rage > 0;
-      const rageKey = `p_${this.cls}_${rage ? 1 : 0}`;
+      const rageKey = this.cls === 'developer'
+        ? `p_developer_${this._devTier ?? 0}_${rage ? 1 : 0}`
+        : `p_${this.cls}_${rage ? 1 : 0}`;
       if (this.textures.exists(rageKey)) this._playerSprite.setTexture(rageKey);
       this._playerSprite.setPosition(p.x, p.y);
       this._playerSprite.setAlpha(p.hitFlash > 0 ? 0.4 : 1);

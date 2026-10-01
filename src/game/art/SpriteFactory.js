@@ -150,20 +150,96 @@ const PEYES = r => [{ x: -.3 * r, y: -.2 * r, r: .22 * r }, { x: .3 * r, y: -.2 
 
 const PLAYER_ART = {
   developer: {
-    shirt: '#2EC4B6',
-    body(g, r) {
+    shirt: t => ['#2EC4B6', '#2EC4B6', '#1D1B2E', '#1D1B2E', '#2D1B4E'][t ?? 0],
+    body(g, r, tier = 0) {
+      // Base: legs + keyboard-like bar
       line(g, [-.16 * r, .52 * r, -.2 * r, .88 * r], 1.6);
       line(g, [.16 * r, .52 * r, .2 * r, .88 * r], 1.6);
       rr(g, -.3 * r, .86 * r, .6 * r, .22 * r, .08 * r); ink(g, '#25A99C', 1.6);
+
+      // Tier 1+: coffee cup in right hand
+      if (tier >= 1) {
+        rr(g, .66 * r, .54 * r, .28 * r, .32 * r, .07 * r); ink(g, '#8B5E3C', 1.6);
+        g.beginPath(); g.arc(.94 * r, .72 * r, .1 * r, Math.PI * -.4, Math.PI * .6); g.lineWidth = 2; g.strokeStyle = '#8B5E3C'; g.stroke();
+        rr(g, .68 * r, .56 * r, .24 * r, .08 * r, .04 * r); g.fillStyle = '#3A1F0A'; g.fill();
+      }
+
+      // Tier 2+: headphone arc over head (drawn in body so it's behind hair)
+      if (tier >= 2) {
+        g.beginPath(); g.arc(0, -.22 * r, 1.02 * r, Math.PI * 1.08, Math.PI * 1.92);
+        g.lineWidth = .13 * r; g.strokeStyle = '#1D1B2E'; g.lineCap = 'round'; g.stroke();
+        g.lineWidth = .07 * r; g.strokeStyle = '#7B5CFF'; g.stroke();
+        // Earcups
+        for (const sx of [-1, 1]) {
+          circ(g, sx * 1.02 * r, -.22 * r, .17 * r); ink(g, '#7B5CFF', 1.8);
+          circ(g, sx * 1.02 * r, -.22 * r, .10 * r); g.fillStyle = '#1D1B2E'; g.fill();
+        }
+      }
+
+      // Tier 3+: RGB keyboard glow strip at feet
+      if (tier >= 3) {
+        const grad = g.createLinearGradient(-.62 * r, 0, .62 * r, 0);
+        grad.addColorStop(0,    '#FF4D6D');
+        grad.addColorStop(0.5,  '#7B5CFF');
+        grad.addColorStop(1,    '#2EC4B6');
+        rr(g, -.62 * r, 1.08 * r, 1.24 * r, .16 * r, .06 * r);
+        g.fillStyle = grad; g.fill();
+        g.lineWidth = 1.4; g.strokeStyle = '#1D1B2E'; g.stroke();
+        // Energy drink can (left hand)
+        rr(g, -.94 * r, .48 * r, .22 * r, .38 * r, .07 * r); ink(g, '#FFD447', 1.6);
+        rr(g, -.94 * r, .48 * r, .22 * r, .1 * r, .04 * r); g.fillStyle = '#FF4D6D'; g.fill();
+      }
+
+      // Tier 4: aura glow behind character
+      if (tier >= 4) {
+        const aura = g.createRadialGradient(0, .2 * r, r * .3, 0, .2 * r, r * 2.2);
+        aura.addColorStop(0,   'rgba(123,92,255,0.35)');
+        aura.addColorStop(0.6, 'rgba(46,28,94,0.15)');
+        aura.addColorStop(1,   'rgba(123,92,255,0)');
+        g.beginPath(); g.ellipse(0, .3 * r, r * 2.2, r * 1.6, 0, 0, Math.PI * 2);
+        g.fillStyle = aura; g.fill();
+      }
     },
-    hair(g, r) {
+    hair(g, r, tier = 0) {
+      // Base: spiky developer hair with side accent blocks
       g.beginPath(); g.moveTo(-.84 * r, -.2 * r);
       for (const [x, y] of [[-.9, -.55], [-.72, -.78], [-.64, -1.04], [-.36, -.92], [-.2, -1.2], [.05, -.97], [.28, -1.17], [.42, -.9], [.7, -1.0], [.74, -.72], [.92, -.52], [.84, -.2]])
         g.lineTo(x * r, y * r);
-      g.quadraticCurveTo(.5 * r, -.55 * r, 0, -.62 * r); g.quadraticCurveTo(-.5 * r, -.55 * r, -.84 * r, -.2 * r); g.closePath(); ink(g, '#2B2B3A', 2.2);
-      g.beginPath(); g.arc(0, -.28 * r, 1.0 * r, Math.PI * 1.1, Math.PI * 1.9); g.lineWidth = 5; g.strokeStyle = C.INK; g.stroke(); g.lineWidth = 2.6; g.strokeStyle = '#2EC4B6'; g.stroke();
-      rr(g, -1.1 * r, -.44 * r, .32 * r, .52 * r, .13 * r); ink(g, '#2EC4B6', 2.2);
-      rr(g, .78 * r, -.44 * r, .32 * r, .52 * r, .13 * r); ink(g, '#2EC4B6', 2.2);
+      g.quadraticCurveTo(.5 * r, -.55 * r, 0, -.62 * r); g.quadraticCurveTo(-.5 * r, -.55 * r, -.84 * r, -.2 * r); g.closePath();
+      // Tier 2+: dark hoodie changes hair base color
+      ink(g, tier >= 2 ? '#1A1A2E' : '#2B2B3A', 2.2);
+
+      // Headband stripe (tier 0-1: teal, tier 2+: purple)
+      const hbColor = tier >= 2 ? '#7B5CFF' : '#2EC4B6';
+      g.beginPath(); g.arc(0, -.28 * r, 1.0 * r, Math.PI * 1.1, Math.PI * 1.9);
+      g.lineWidth = 5; g.strokeStyle = '#1D1B2E'; g.stroke();
+      g.lineWidth = 2.6; g.strokeStyle = hbColor; g.stroke();
+      rr(g, -1.1 * r, -.44 * r, .32 * r, .52 * r, .13 * r); ink(g, hbColor, 2.2);
+      rr(g, .78 * r, -.44 * r, .32 * r, .52 * r, .13 * r); ink(g, hbColor, 2.2);
+
+      // Tier 4: floating star/crown dots above hair
+      if (tier >= 4) {
+        for (let i = -2; i <= 2; i++) {
+          const ox = i * .22 * r, oy = -1.28 * r + Math.abs(i) * .04 * r;
+          circ(g, ox, oy, .065 * r); ink(g, '#FFD447', 1.2);
+        }
+      }
+    },
+    face(g, r, tier = 0) {
+      // Tier 1+: round glasses
+      if (tier >= 1) {
+        for (const ox of [-.3, .3]) {
+          circ(g, ox * r, -.18 * r, .24 * r);
+          g.lineWidth = 2.2; g.strokeStyle = '#1D1B2E'; g.stroke();
+        }
+        // Bridge
+        g.beginPath(); g.moveTo(-.06 * r, -.18 * r); g.lineTo(.06 * r, -.18 * r);
+        g.lineWidth = 1.8; g.strokeStyle = '#1D1B2E'; g.stroke();
+        // Arms
+        g.beginPath(); g.moveTo(-.54 * r, -.18 * r); g.lineTo(-.7 * r, -.1 * r);
+        g.moveTo(.54 * r, -.18 * r); g.lineTo(.7 * r, -.1 * r);
+        g.lineWidth = 1.6; g.strokeStyle = '#1D1B2E'; g.stroke();
+      }
     }
   },
   manager: {
@@ -231,15 +307,20 @@ const PLAYER_ART = {
   },
 };
 
-function drawPlayer(g, r, cls, rage) {
+function drawPlayer(g, r, cls, rage, tier = 0) {
   const A = PLAYER_ART[cls] || PLAYER_ART.developer;
   const skin = rage ? '#FF9A8A' : '#FFD7B0';
-  rr(g, -.62 * r, .4 * r, 1.24 * r, .8 * r, .3 * r); ink(g, A.shirt, 2.4);
-  A.body && A.body(g, r);
+  const shirtColor = typeof A.shirt === 'function' ? A.shirt(tier) : A.shirt;
+
+  // Draw aura/glow FIRST (behind everything) for tier 4
+  if (tier >= 4 && A.body) A.body(g, r, tier);  // aura drawn in body before shirt
+
+  rr(g, -.62 * r, .4 * r, 1.24 * r, .8 * r, .3 * r); ink(g, shirtColor, 2.4);
+  if (tier < 4) { A.body && A.body(g, r, tier); }
   circ(g, -.74 * r, .74 * r, .17 * r); ink(g, skin, 2);
   circ(g, .74 * r, .74 * r, .17 * r); ink(g, skin, 2);
   circ(g, 0, -.2 * r, .86 * r); ink(g, skin, 2.6);
-  A.hair(g, r);
+  A.hair(g, r, tier);
   const E = PEYES(r); E.forEach(e => eyeWhite(g, e));
   if (rage) {
     brows(g, E, 1.6, 3);
@@ -250,7 +331,7 @@ function drawPlayer(g, r, cls, rage) {
     g.beginPath(); g.arc(.04 * r, .1 * r, .2 * r, .18 * Math.PI, .82 * Math.PI); g.lineWidth = 2.2; g.strokeStyle = C.INK; g.stroke();
   }
   blush(g, -.56 * r, .06 * r, .11 * r); blush(g, .56 * r, .06 * r, .11 * r);
-  A.face && A.face(g, r);
+  A.face && A.face(g, r, tier);
 }
 
 // ── Pupils (drawn at runtime, not baked into sprite) ─────────────────────
@@ -294,16 +375,34 @@ export function registerTextures(scene) {
     scene.textures.addCanvas('e_' + type + '_w', fc);
   }
 
-  // Players (both normal and rage)
-  const classes = ['developer', 'manager', 'designer', 'sales', 'chef', 'driver'];
+  // Players: developer gets 5 tier variants (×2 normal/rage), others get standard 2
   const PR = 15;
-  for (const cls of classes) {
+  const otherClasses = ['manager', 'designer', 'sales', 'chef', 'driver'];
+  for (const cls of otherClasses) {
     for (const rage of [false, true]) {
       const key = `p_${cls}_${rage ? 1 : 0}`;
       if (scene.textures.exists(key)) continue;
-      const { canvas } = makeCanvas(PR, (g, r) => drawPlayer(g, r, cls, rage));
+      const { canvas } = makeCanvas(PR, (g, r) => drawPlayer(g, r, cls, rage, 0));
       scene.textures.addCanvas(key, canvas);
     }
+  }
+  // Developer: register tiers 0-4 × normal/rage
+  for (let tier = 0; tier <= 4; tier++) {
+    for (const rage of [false, true]) {
+      const key = `p_developer_${tier}_${rage ? 1 : 0}`;
+      if (scene.textures.exists(key)) continue;
+      const { canvas } = makeCanvas(PR, (g, r) => drawPlayer(g, r, 'developer', rage, tier));
+      scene.textures.addCanvas(key, canvas);
+    }
+  }
+  // Legacy keys for safety (p_developer_0 / p_developer_1)
+  if (!scene.textures.exists('p_developer_0')) {
+    const { canvas } = makeCanvas(PR, (g, r) => drawPlayer(g, r, 'developer', false, 0));
+    scene.textures.addCanvas('p_developer_0', canvas);
+  }
+  if (!scene.textures.exists('p_developer_1')) {
+    const { canvas } = makeCanvas(PR, (g, r) => drawPlayer(g, r, 'developer', true, 0));
+    scene.textures.addCanvas('p_developer_1', canvas);
   }
 
   // Gem (EXP)
@@ -346,13 +445,13 @@ export function registerTextures(scene) {
   }
 }
 
-/** Generate portrait data URL for menu display */
-export function portraitDataURL(cls, r = 30) {
+/** Generate portrait data URL for menu display. tier 0-4 for developer visual evolution. */
+export function portraitDataURL(cls, r = 30, tier = 0) {
   const size = Math.ceil(r * 3.4);
   const c = document.createElement('canvas'); c.width = c.height = size * SS;
   const g = c.getContext('2d');
   g.scale(SS, SS); g.translate(size / 2, size / 2 + r * .28);
-  drawPlayer(g, r, cls, false);
+  drawPlayer(g, r, cls, false, tier);
   // Pupils looking forward
   const E = PEYES(r);
   g.fillStyle = C.INK;

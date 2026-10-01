@@ -129,6 +129,24 @@ img { max-width: 100%; display: block; }
   white-space: nowrap;
 }
 
+/* ─── 3D Tilt Portrait ───────────────────────── */
+.tilt-wrap {
+  display: inline-block;
+  perspective: 320px;
+  cursor: default;
+}
+.tilt-img {
+  border-radius: 14px;
+  transition: transform 0.14s cubic-bezier(.25,.46,.45,.94), box-shadow 0.14s ease;
+  will-change: transform;
+  backface-visibility: hidden;
+  box-shadow: 0 4px 16px rgba(29,27,46,.18);
+}
+.tilt-wrap:hover .tilt-img,
+.tilt-wrap:focus-within .tilt-img {
+  box-shadow: 0 8px 28px rgba(29,27,46,.28);
+}
+
 /* ─── Layout ─────────────────────────────────── */
 .game-root {
   position: relative;

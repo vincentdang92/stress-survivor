@@ -2,6 +2,8 @@
 import { useState, useEffect } from 'preact/hooks';
 import { CLASSES, ENEMIES, CARDS } from '../game/data/gameData.js';
 import { portraitDataURL, enemyPortraitDataURL } from '../game/art/SpriteFactory.js';
+import { TiltPortrait } from '../components/TiltPortrait.jsx';
+import { getUpgradeTier } from './UpgradeScreen.jsx';
 
 function loadOwned() {
   try { const p = JSON.parse(localStorage.getItem('ss_profile_v1')); return p?.owned || ['developer']; } catch { return ['developer']; }
@@ -18,7 +20,7 @@ const ENEMY_LABELS = {
 
 const CARD_BY_ID = Object.fromEntries(CARDS.map(c => [c.id, c]));
 
-function CharacterDetail({ cls, portrait }) {
+function CharacterDetail({ cls, clsKey, portrait }) {
   // Locked / soon character → teaser only
   if (cls.soon) {
     return (
@@ -51,15 +53,33 @@ function CharacterDetail({ cls, portrait }) {
 
   const weapons = (cls.weapons || []).map(id => CARD_BY_ID[id]).filter(Boolean);
   const passives = (cls.passives || []).map(id => CARD_BY_ID[id]).filter(Boolean);
+  const tier = clsKey === 'developer' ? getUpgradeTier() : 0;
+  const TIER_NAMES  = ['Rookie', 'Experienced', 'Veteran', 'Elite', 'Legendary'];
+  const TIER_COLORS = ['#888', '#2EC4B6', '#7B5CFF', '#FF8A3D', '#FFD447'];
+
   return (
     <div class="book-detail">
       <div class="book-detail-head">
-        {portrait
-          ? <img src={portrait} alt={cls.name} class="book-detail-portrait" />
-          : <span style={{ fontSize: 56 }}>👤</span>}
+        {clsKey === 'developer' && portrait
+          ? <TiltPortrait src={portraitDataURL('developer', 48, tier)} size={80} maxDeg={18} />
+          : portrait
+            ? <img src={portrait} alt={cls.name} class="book-detail-portrait" />
+            : <span style={{ fontSize: 56 }}>👤</span>}
         <div>
           <h3 style={{ margin: '0 0 4px', font: '800 22px var(--display)' }}>{cls.name}</h3>
           <div style={{ font: '400 13px/1.5 var(--body)', color: '#666' }}>{cls.line}</div>
+          {clsKey === 'developer' && (
+            <span style={{
+              display: 'inline-block', marginTop: 6,
+              font: '700 11px var(--mono)',
+              color: TIER_COLORS[tier],
+              background: 'var(--paper2)',
+              border: `1.5px solid ${TIER_COLORS[tier]}`,
+              borderRadius: 6, padding: '2px 8px',
+            }}>
+              {['⚪','🟢','🔵','🟠','⭐'][tier]} {TIER_NAMES[tier]}
+            </span>
+          )}
           {cls.lore && <div style={{ font: '400 12px/1.5 var(--body)', color: '#888', marginTop: 6, fontStyle: 'italic' }}>{cls.lore}</div>}
         </div>
       </div>
@@ -183,7 +203,7 @@ export function BookScreen({ onClose }) {
 
             {/* Character detail */}
             <div class="book-char-detail">
-              {selCls && <CharacterDetail cls={selCls} portrait={portraits[selChar]} />}
+              {selCls && <CharacterDetail cls={selCls} clsKey={selChar} portrait={portraits[selChar]} />}
             </div>
           </div>
         )}
