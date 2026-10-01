@@ -65,6 +65,70 @@ input, textarea, select {
 }
 img { max-width: 100%; display: block; }
 
+/* ─── Quick-win animations ──────────────────── */
+
+/* 1. Idle breathing — portrait trên menu */
+@keyframes idle-breathe {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50%       { transform: translateY(-5px) scale(1.02); }
+}
+@keyframes idle-blink {
+  0%, 90%, 100% { transform: scaleY(1); }
+  94%            { transform: scaleY(0.06); }
+}
+.portrait-breathe {
+  animation: idle-breathe 2.8s ease-in-out infinite;
+  transform-origin: center bottom;
+  will-change: transform;
+}
+/* selected class in picker also breathes */
+.cls.sel img, .cd-head img { animation: idle-breathe 2.8s ease-in-out infinite; transform-origin: center bottom; }
+
+/* 2. RAGE vignette — viền đỏ nhấp nhô */
+@keyframes rage-pulse {
+  from { box-shadow: inset 0 0 60px rgba(255,77,109,.50); }
+  to   { box-shadow: inset 0 0 140px rgba(255,77,109,.85); }
+}
+.rage-vignette {
+  position: absolute; inset: 0; pointer-events: none; z-index: 88;
+  animation: rage-pulse 0.45s ease-in-out infinite alternate;
+}
+
+/* 3. Low HP heartbeat — nhịp đập khi HP thấp */
+@keyframes hp-heartbeat {
+  0%,100% { box-shadow: inset 0 0 35px rgba(255,77,109,.20); }
+  14%     { box-shadow: inset 0 0 90px rgba(255,77,109,.65); }
+  28%     { box-shadow: inset 0 0 45px rgba(255,77,109,.30); }
+  42%     { box-shadow: inset 0 0 80px rgba(255,77,109,.55); }
+  56%     { box-shadow: inset 0 0 35px rgba(255,77,109,.20); }
+}
+.hp-danger-vignette {
+  position: absolute; inset: 0; pointer-events: none; z-index: 87;
+  animation: hp-heartbeat 1.0s ease-in-out infinite;
+}
+
+/* 4. Kill streak flash text — slide down rồi fade */
+@keyframes streak-in {
+  0%   { transform: translateY(-32px) scale(0.7); opacity: 0; }
+  18%  { transform: translateY(4px)   scale(1.08); opacity: 1; }
+  28%  { transform: translateY(0)     scale(1);    opacity: 1; }
+  75%  { transform: translateY(0)     scale(1);    opacity: 1; }
+  100% { transform: translateY(12px)  scale(0.9);  opacity: 0; }
+}
+.streak-msg {
+  position: absolute;
+  top: 18%; left: 50%;
+  transform: translateX(-50%);
+  z-index: 95;
+  pointer-events: none;
+  text-align: center;
+  font: 900 clamp(22px, 6vw, 36px) var(--display);
+  text-shadow: 3px 3px 0 rgba(0,0,0,.45);
+  letter-spacing: .04em;
+  animation: streak-in 2.0s ease-out forwards;
+  white-space: nowrap;
+}
+
 /* ─── Layout ─────────────────────────────────── */
 .game-root {
   position: relative;

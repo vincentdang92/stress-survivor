@@ -34,8 +34,10 @@ export function HUD() {
   const [hud, setHud] = useState({ hp: 100, maxHp: 100, stress: 0, lvl: 1, xp: 0, nextXp: 10, kills: 0, taps: 0, combo: 0, rageActive: false, dashCd: 0, clock: '08:00', wave: '', rageReady: false });
   const [loadout, setLoadout] = useState({ cards: {}, synActive: new Set() });
   const [boss, setBoss] = useState(null);
+  const [streak, setStreak] = useState(null); // { key, text, color }
   const comboRef = useRef(null);
   const prevCombo = useRef(0);
+  const streakTimerRef = useRef(null);
 
   useEffect(() => {
     const offs = [
@@ -43,11 +45,12 @@ export function HUD() {
       bus.on('LOADOUT_UPDATE', data => setLoadout(data)),
       bus.on('BOSS_HP', data => setBoss(data)),
       bus.on('BOSS_PHASE_CHANGED', data => setBoss(data)),
-      bus.on('BATTLE_STARTED', () => setBoss(null)),
+      bus.on('BATTLE_STARTED', () => { setBoss(null); setStreak(null); }),
     ];
     return () => offs.forEach(off => off());
   }, []);
 
+  // Combo pop animation
   useEffect(() => {
     if (hud.combo > prevCombo.current && comboRef.current) {
       comboRef.current.classList.remove('pop');
@@ -57,10 +60,28 @@ export function HUD() {
     prevCombo.current = hud.combo;
   }, [hud.combo]);
 
+  // Kill streak announcer — trigger on combo milestones
+  useEffect(() => {
+    const c = hud.combo;
+    let msg = null;
+    if      (c === 5)  msg = { text: '🔥 COMBO × 5!',      color: '#FFD447' };
+    else if (c === 10) msg = { text: '⚡ KILLING SPREE!',   color: '#FF8A3D' };
+    else if (c === 20) msg = { text: '☄️ UNSTOPPABLE!',     color: '#FF4D6D' };
+    else if (c === 40) msg = { text: '💀 GODLIKE!',         color: '#7B5CFF' };
+    else if (c > 40 && c % 20 === 0) msg = { text: `👑 × ${c} COMBO!`, color: '#7B5CFF' };
+    if (msg) {
+      clearTimeout(streakTimerRef.current);
+      // Unique key forces re-mount → re-triggers animation
+      setStreak({ ...msg, key: Date.now() });
+      streakTimerRef.current = setTimeout(() => setStreak(null), 2100);
+    }
+  }, [hud.combo]);
+
   const xpPct = hud.nextXp > 0 ? Math.min(100, (hud.xp / hud.nextXp) * 100) : 0;
   const hpPct = hud.maxHp > 0 ? Math.min(100, (hud.hp / hud.maxHp) * 100) : 0;
   const stPct = Math.min(100, hud.stress);
   const clockLate = hud.clock && hud.clock >= '09:30';
+  const isLowHp = hpPct > 0 && hpPct < 30;
 
   const handleDash = useCallback(() => bus.emit('DASH_PRESSED'), []);
   const handleRage = useCallback(() => bus.emit('RAGE_PRESSED'), []);
@@ -68,6 +89,17 @@ export function HUD() {
 
   return (
     <>
+      {/* Vignettes — behind everything else */}
+      {hud.rageActive && <div class="rage-vignette" />}
+      {isLowHp && !hud.rageActive && <div class="hp-danger-vignette" />}
+
+      {/* Kill streak announcer */}
+      {streak && (
+        <div key={streak.key} class="streak-msg" style={{ color: streak.color }}>
+          {streak.text}
+        </div>
+      )}
+
       {/* XP Bar */}
       <div class="xpbar"><i class="xp-fill" style={{ width: xpPct + '%' }} /></div>
 

@@ -1032,11 +1032,20 @@ export class BattleScene extends Phaser.Scene {
   _killEnemy(e) {
     e.dead = true; this.kills++;
     // Earn gold: 5 per normal kill, 20 for boss
+    const goldEarned = e.T.boss ? 20 : 5;
     try {
       const u = JSON.parse(localStorage.getItem('ss_upgrades_v1') || '{}');
-      u.gold = (u.gold || 0) + (e.T.boss ? 20 : 5);
+      u.gold = (u.gold || 0) + goldEarned;
       localStorage.setItem('ss_upgrades_v1', JSON.stringify(u));
     } catch { }
+    // Gold pop animation — float up from kill position
+    this.damageTexts.push({
+      x: e.x + (this.rng.next() - 0.5) * 20,
+      y: e.y - e.r - 5,
+      txt: `+${goldEarned} 🪙`,
+      color: '#FFD447',
+      life: 1.3, alpha: 1, pun: true,  // pun=true → bigger font in renderer
+    });
     // Combo
     const now = this.elapsed;
     if (now - this.comboTimer < 2.5) { this.combo++; if (this.combo > this.maxCombo) this.maxCombo = this.combo; SFX.combo(); }
