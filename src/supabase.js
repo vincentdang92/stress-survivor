@@ -156,7 +156,14 @@ export async function upgradeAnonToEmail(email, password) {
 /** Đăng xuất */
 export async function signOut() {
   if (!supabase) return;
+  // 1. Push local upgrades lên cloud trước khi logout
+  await pushPlayerData().catch(() => {});
+  // 2. Sign out Supabase
   await supabase.auth.signOut();
+  // 3. Clear player cache (có auth_user_id của user cũ)
+  localStorage.removeItem(PLAYER_KEY);
+  // 4. Reset anon_id → session tiếp theo là identity mới, tránh leak data
+  localStorage.removeItem(ANON_KEY);
 }
 
 /** Lắng nghe thay đổi auth state */

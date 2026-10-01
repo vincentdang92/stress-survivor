@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import { createPortal } from 'preact/compat';
 import {
   signInWithEmail, signUpWithEmail, upgradeAnonToEmail, signOut,
-  onAuthChange, getCurrentUser, pullPlayerData,
+  onAuthChange, getCurrentUser, pullPlayerData, pushPlayerData,
 } from '../supabase.js';
 
 // ── Sync read Supabase session from localStorage (no async, no re-render on mount) ──
@@ -251,6 +251,16 @@ export function AuthModal({ onClose, onAuthSuccess }) {
     onAuthSuccessRef.current?.(null);
   };
 
+  const [syncStatus, setSyncStatus] = useState('syncing'); // 'syncing' | 'ok' | 'err'
+
+  // Thực sự push data khi modal mở (verify sync)
+  useEffect(() => {
+    setSyncStatus('syncing');
+    pushPlayerData()
+      .then(() => setSyncStatus('ok'))
+      .catch(() => setSyncStatus('err'));
+  }, []);
+
   const content = loggedInEmail ? (
     <div class="auth-overlay">
       <div class="auth-modal">
@@ -261,7 +271,9 @@ export function AuthModal({ onClose, onAuthSuccess }) {
         <div class="auth-logged-in">
           <div class="auth-avatar">✉️</div>
           <div class="auth-email">{loggedInEmail}</div>
-          <div class="auth-badge ok">✅ Đã đồng bộ</div>
+          <div class={`auth-badge ${syncStatus === 'ok' ? 'ok' : syncStatus === 'err' ? 'err' : ''}`}>
+            {syncStatus === 'syncing' ? '⏳ Đang đồng bộ...' : syncStatus === 'ok' ? '✅ Đã đồng bộ' : '⚠️ Không thể đồng bộ'}
+          </div>
           <p style={{ fontSize: 13, color: '#666', textAlign: 'center', lineHeight: 1.5 }}>
             Data nhân vật được lưu và đồng bộ tự động trên mọi thiết bị.
           </p>

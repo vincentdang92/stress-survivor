@@ -81,10 +81,18 @@ export function App() {
   // Init auth + player on mount
   useEffect(() => {
     initAuth().then(async ({ user }) => {
-      if (user) await pullPlayerData();
       const p = JSON.parse(localStorage.getItem('ss_profile_v1') || '{}');
       const name = p.displayName || 'Nhân viên ẩn danh';
-      getOrCreatePlayer(name, p.owned?.[0] || 'developer').then(setPlayer);
+      // 1. getOrCreatePlayer trước: link auth_user_id nếu đã login
+      const pl = await getOrCreatePlayer(name, p.owned?.[0] || 'developer');
+      setPlayer(pl);
+      // 2. pullPlayerData sau: giờ mới tìm được player theo auth_user_id
+      if (user) {
+        await pullPlayerData();
+        // Reload player từ cache sau khi merge remote data
+        const refreshed = await getOrCreatePlayer(name, p.owned?.[0] || 'developer');
+        setPlayer(refreshed);
+      }
     });
   }, []);
 
@@ -204,9 +212,22 @@ export function App() {
       <AuthModal
         onClose={() => setShowAuth(false)}
         onAuthSuccess={async (u) => {
-          if (u) await pullPlayerData();
           const p = JSON.parse(localStorage.getItem('ss_profile_v1') || '{}');
-          getOrCreatePlayer(p.displayName || 'Nhân viên ẩn danh', 'developer').then(setPlayer);
+          const name = p.displayName || 'Nhân viên ẩn danh';
+          if (u) {
+            // Login: link auth_user_id trước, rồi pull remote data
+            const pl = await getOrCreatePlayer(name, 'developer');
+            setPlayer(pl);
+            await pullPlayerData();
+            // Reload sau khi merge remote upgrades về localStorage
+            const refreshed = await getOrCreatePlayer(name, 'developer');
+            setPlayer(refreshed);
+          } else {
+            // Logout: signOut đã xóa anon_id → tạo identity hoàn toàn mới
+            setPlayer(null);
+            const fresh = await getOrCreatePlayer(name, 'developer');
+            setPlayer(fresh);
+          }
         }}
       />
     )}
