@@ -174,7 +174,7 @@ export class BattleScene extends Phaser.Scene {
 
   _recompute() {
     // Load meta-upgrade bonuses from localStorage
-    let upgBonuses = { hpBonus: 0, atkMul: 1, spdMul: 1, critBonus: 0, stressResist: 0 };
+    let upgBonuses = { hpBonus: 0, atkMul: 1, spdMul: 1, critBonus: 0, stressResist: 0, devIde: 0, devMouse: 0, devCompile: 0 };
     try {
       const u = JSON.parse(localStorage.getItem('ss_upgrades_v1') || '{}');
       upgBonuses = {
@@ -183,6 +183,9 @@ export class BattleScene extends Phaser.Scene {
         spdMul:       1 + (u.spd || 0) * 0.05,
         critBonus:    (u.crit || 0) * 0.04,
         stressResist: (u.stressResist || 0) * 0.08,
+        devIde:       (u.dev_ide || 0) * 0.08,
+        devMouse:     u.dev_mouse || 0,
+        devCompile:   u.dev_compile || 0,
       };
     } catch { }
 
@@ -195,6 +198,9 @@ export class BattleScene extends Phaser.Scene {
       burnAll: 0, burnMul: 1,
       bugMul: this.cls === 'developer' ? 1.3 : 1,
       maxHp: 100 + upgBonuses.hpBonus,
+      devIdeMul: 1 - upgBonuses.devIde,
+      devMouseExtra: upgBonuses.devMouse,
+      devCompileBonus: upgBonuses.devCompile * 3,
     };
     for (const [id, lv] of Object.entries(this.cards)) {
       const c = CARD[id]; if (c.stat) c.stat(st, lv);
@@ -358,6 +364,22 @@ export class BattleScene extends Phaser.Scene {
     if (this.trial) { this.trialTimeLeft -= dt; if (this.trialTimeLeft <= 0) { this._endBattle(false, true); return; } }
 
     this._updatePlayer(dt);
+    // Process pending terminal bursts
+    if (this._pendingTerminal?.length) {
+      this._pendingTerminal = this._pendingTerminal.filter(t => {
+        t.delay -= dt;
+        if (t.delay > 0) return true;
+        // Burst!
+        const dmg = t.dmg;
+        for (let i = 0; i < t.count; i++) {
+          const ang = (i / t.count) * Math.PI * 2;
+          this.bullets.push({ x: t.x, y: t.y, vx: Math.cos(ang)*380, vy: Math.sin(ang)*380, dmg, tex: 'staple', life: 1.0, pierce: 2, burn: this.stats.burnAll });
+        }
+        this.particles.push({ type: 'ring', x: t.x, y: t.y, r: 0, maxR: 100, life: 0.3, max: 0.3, color: 0x2EC4B6 });
+        SFX.boom();
+        return false;
+      });
+    }
     this._updateWeapons(dt);
     this._updateOrbit(dt);
     this._updateBullets(dt);
@@ -446,7 +468,10 @@ export class BattleScene extends Phaser.Scene {
 
       if (this.weaponTimers[id] > 0) continue;
 
-      const cd = typeof c.cd === 'function' ? c.cd(lv) : (c.cd || 1);
+      let cd = typeof c.cd === 'function' ? c.cd(lv) : (c.cd || 1);
+      if (['terminal', 'hotfix', 'deploy', 'mouse'].includes(id)) {
+        cd *= (this.stats.devIdeMul || 1);
+      }
       this.weaponTimers[id] = cd;
 
       const extraProj = st.extraProj;
@@ -457,6 +482,8 @@ export class BattleScene extends Phaser.Scene {
         case 'coffee':  this._fireCoffee(lv, extraProj); break;
         case 'keyboard': this._fireKeyboard(lv); break;
         case 'hotfix':  this._fireHotfix(lv, extraProj); break;
+        case 'terminal': this._fireTerminal(lv, extraProj); break;
+        case 'deploy':   this._fireDeploy(lv, extraProj); break;
       }
     }
   }
@@ -556,12 +583,51 @@ export class BattleScene extends Phaser.Scene {
     SFX.zap();
   }
 
+  _fireTerminal(lv, extra) {
+    const p = this.player;
+    const dmg = Math.round(14 * (1 + 0.25 * (lv - 1)));
+    const count = 4 + lv + extra;
+    // Delayed burst: push a pending terminal burst
+    if (!this._pendingTerminal) this._pendingTerminal = [];
+    this._pendingTerminal.push({ x: p.x, y: p.y, delay: 0.6, dmg, count });
+    // Visual indicator
+    this.particles.push({ type: 'ring', x: p.x, y: p.y, r: 0, maxR: 60, life: 0.6, max: 0.6, color: 0x2EC4B6 });
+    SFX.shoot();
+  }
+
+  _fireDeploy(lv, extra) {
+    const p = this.player;
+    const dmg = Math.round(45 * (1 + 0.25 * (lv - 1)));
+    const radius = 90 + 15 * lv;
+    const count = (lv >= 3 ? 2 : 1) + (extra > 0 ? 1 : 0);
+    // Find cluster center (average position of up to 5 nearest enemies)
+    const nearby = this.enemies
+      .filter(e => !e.dead)
+      .sort((a, b) => Math.hypot(a.x-p.x,a.y-p.y) - Math.hypot(b.x-p.x,b.y-p.y))
+      .slice(0, 5);
+    if (nearby.length === 0) return;
+    const cx = nearby.reduce((s,e)=>s+e.x,0)/nearby.length;
+    const cy = nearby.reduce((s,e)=>s+e.y,0)/nearby.length;
+    for (let i = 0; i < count; i++) {
+      const ang = Math.atan2(cy - p.y, cx - p.x) + (i - (count-1)/2) * 0.25;
+      this.bullets.push({
+        x: p.x, y: p.y,
+        vx: Math.cos(ang) * 420, vy: Math.sin(ang) * 420,
+        dmg, tex: 'dot', life: 1.4, pierce: 99,
+        aoe: radius, isCoffee: true,
+        burn: this.stats.burnAll + 12, burnZone: true, burnMul: this.stats.burnMul
+      });
+    }
+    this.cameras.main.shake(220, 0.01);
+    SFX.boom();
+  }
+
   // ── Orbit (mouse weapon) ──────────────────────────────────────────────
   _updateOrbit(dt) {
     const lv = this.cards['mouse'];
     if (!lv) return;
     const p = this.player;
-    const count = lv >= 5 ? 4 : lv >= 3 ? 3 : 2;
+    const count = (lv >= 5 ? 4 : lv >= 3 ? 3 : 2) + (this.stats.devMouseExtra || 0);
     const dmg = Math.round(11 * (1 + 0.25 * (lv - 1)));
     const orbitR = 60 + count * 5;
     this.orbitAngle += dt * (2 + 0.3 * lv) * (p.rage > 0 ? 1.6 : 1);
@@ -1070,7 +1136,8 @@ export class BattleScene extends Phaser.Scene {
       if (Math.hypot(e.x - wx, e.y - wy) < e.r + 30) { this._hurtEnemy(e, dmg); break; }
     }
     this.devTaps = (this.devTaps || 0) + 1;
-    if (this.devTaps >= 20) {
+    const compileThreshold = Math.max(8, 20 - (this.stats.devCompileBonus || 0));
+    if (this.devTaps >= compileThreshold) {
       this.devTaps = 0;
       // Compile: 16 bullets outward
       const p = this.player;

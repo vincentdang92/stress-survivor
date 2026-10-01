@@ -6,7 +6,8 @@ import { pushPlayerData } from '../supabase.js';
 
 // ─── Data helpers ────────────────────────────────────────────────────────────
 
-const DEFAULTS = { gold: 0, hp: 0, atk: 0, spd: 0, crit: 0, stressResist: 0 };
+const DEFAULTS = { gold: 0, hp: 0, atk: 0, spd: 0, crit: 0, stressResist: 0,
+  dev_mouse: 0, dev_ide: 0, dev_compile: 0 };
 
 export function getUpgrades() {
   try {
@@ -78,6 +79,30 @@ const STATS = [
     name: 'Kháng Stress',
     costs: [80, 160, 320, 550, 800],
     bonusText: lvl => lvl > 0 ? `-${lvl * 8}% stress` : '-8% stress / cấp',
+  },
+];
+
+const DEV_STATS = [
+  {
+    key: 'dev_mouse',
+    icon: '🖱️',
+    name: 'Chuột Thêm Quỹ Đạo',
+    costs: [80, 160, 300, 500, 750],
+    bonusText: lvl => lvl > 0 ? `+${lvl} chuột bay quanh người` : '+1 chuột / cấp (max +5)',
+  },
+  {
+    key: 'dev_ide',
+    icon: '💻',
+    name: 'IDE Turbo',
+    costs: [70, 140, 260, 420, 620],
+    bonusText: lvl => lvl > 0 ? `CD vũ khí Dev -${lvl * 8}%` : '-8% CD Hotfix, Terminal, Deploy / cấp',
+  },
+  {
+    key: 'dev_compile',
+    icon: '⚡',
+    name: 'Tăng Tốc Compile',
+    costs: [60, 120, 220, 380, 580],
+    bonusText: lvl => lvl > 0 ? `Tap COMPILE cần ${Math.max(8, 20 - lvl * 3)} thay vì 20` : 'Giảm số tap cần để COMPILE (-3 tap / cấp)',
   },
 ];
 
@@ -174,6 +199,22 @@ export function UpgradeScreen({ onClose }) {
             onBuy={handleBuy}
           />
         ))}
+      </div>
+
+      {/* Developer-specific section */}
+      <div style={{ marginTop: 16 }}>
+        <div class="eyebrow" style={{ marginBottom: 8 }}>⚙️ Nâng cấp Developer</div>
+        <div class="upgrade-grid">
+          {DEV_STATS.map(stat => (
+            <UpgradeCard
+              key={stat.key}
+              stat={stat}
+              level={upgrades[stat.key] || 0}
+              gold={upgrades.gold}
+              onBuy={handleBuy}
+            />
+          ))}
+        </div>
       </div>
 
       {/* Footer */}

@@ -64,6 +64,27 @@ export const CARDS = [
     desc: l => `Tia sét nhảy qua ${3 + l} địch, ${dv(24, l)} sát thương, gấp đôi lên BUG.`,
   },
   {
+    id: 'terminal',
+    icon: '🖥️', name: 'Terminal Lệnh',
+    type: 'weapon', rarity: 'rare', tags: ['developer', 'aoe'],
+    cd: l => 2.6 - l * 0.1,
+    desc: l => `Sau 0.6s, phóng ${4 + l} lệnh code ra mọi hướng, ${Math.round(14 * (1 + 0.25 * (l-1)))} sát thương mỗi lệnh.`,
+  },
+  {
+    id: 'rubber_duck',
+    icon: '🦆', name: 'Debug Vịt Gỗ',
+    type: 'passive', rarity: 'rare', tags: ['developer', 'crit'],
+    stat: (s, l) => { s.crit += 0.07 * l; s.atkSpd += 0.06 * l; },
+    desc: l => `Chí mạng +${7*l}%, tốc đánh +${6*l}%. (Vịt không phán xét.)`,
+  },
+  {
+    id: 'deploy',
+    icon: '🚀', name: 'Deploy Production',
+    type: 'weapon', rarity: 'epic', tags: ['developer', 'aoe', 'fire'],
+    cd: l => 3.5 - l * 0.15,
+    desc: l => `Phóng ${l >= 3 ? 2 : 1} tên lửa vào nhóm địch đông nhất, ${Math.round(45 * (1 + 0.25 * (l-1)))} sát thương, gây bỏng.`,
+  },
+  {
     id: 'espresso', icon: '☕', name: 'Espresso Double Shot',
     type: 'passive', rarity: 'common', tags: ['coffee', 'speed'],
     stat: (s, l) => { s.atkSpd += 0.14 * l; },
@@ -127,6 +148,7 @@ export const SYNERGIES = [
   { id: 'burn',        name: 'CHÁY DEADLINE',  need: { fire: 2 },                      desc: 'Sát thương bỏng x2',                    apply: s => { s.burnMul *= 2; } },
   { id: 'zen',         name: 'ZEN OFFICE',     need: { calm: 2 },                      desc: 'Hồi 2 máu mỗi giây',                    apply: s => { s.regen += 2; } },
   { id: 'supply',      name: 'VĂN PHÒNG PHẨM', need: { office: 3 },                   desc: 'Mọi vũ khí bắn thêm 1 viên',            apply: s => { s.extraProj += 1; } },
+  { id: 'dev_stack', name: 'DEV STACK', need: { developer: 3 }, desc: 'Sát thương +30%, CD vũ khí developer -20%', apply: s => { s.dmgMul += 0.3; s.atkSpd += 0.2; } },
 ];
 export const SYN = Object.fromEntries(SYNERGIES.map(s => [s.id, s]));
 
@@ -137,6 +159,9 @@ export const CLASSES = {
     start: 'stapler', bias: 'developer',
     passive: 'Debug Mode', pdesc: '+30% sát thương lên địch BUG.',
     tap: 'Gõ phím: mỗi tap bắn một ký tự code về điểm chạm. Đủ 20 tap thì COMPILE, bắn 16 ký tự ra xung quanh.',
+    lore: 'Một developer full-stack thứ thiệt. Uống cà phê thay nước, ngủ cùng bug, và tự hào về commit "fix typo" lúc 3 giờ sáng.',
+    weapons: ['stapler', 'mouse', 'hotfix', 'terminal', 'deploy'],
+    passives: ['rubber_duck', 'glasses', 'espresso'],
     soon: false,
   },
   manager: {
