@@ -173,6 +173,7 @@ export class BattleScene extends Phaser.Scene {
     this.tapTimes = [];
     this.rageTaps = 0;
     this.kills = 0;
+    this.goldEarned = 0;
     this.combo = 0; this.comboTimer = 0; this.maxCombo = 0;
     this.dmgDealt = 0;
     this.synActive = new Set();
@@ -1045,6 +1046,7 @@ export class BattleScene extends Phaser.Scene {
       u.gold = (u.gold || 0) + goldEarned;
       localStorage.setItem('ss_upgrades_v1', JSON.stringify(u));
     } catch { }
+    this.goldEarned += goldEarned;
     // Gold pop animation — float up from kill position
     this.damageTexts.push({
       x: e.x + (this.rng.next() - 0.5) * 20,
@@ -1304,10 +1306,12 @@ export class BattleScene extends Phaser.Scene {
     if (won) SFX.win(); else SFX.lose();
     bus.emit('BATTLE_COMPLETED', {
       won, trial,
+      cls: this.cls,
       stats: {
         kills: this.kills, combo: this.maxCombo,
         taps: this.taps, dmg: this.dmgDealt,
         time: this.elapsed, lvl: this.player.lvl,
+        gold: this.goldEarned,
       },
       cards: this.cards, synActive: [...this.synActive],
     });
