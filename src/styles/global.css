@@ -606,14 +606,14 @@ img { max-width: 100%; display: block; }
   .act { width: 64px; height: 64px; }
   .act.rage-btn { width: 80px; height: 80px; }
 
-  /* Level-up overlay → bottom sheet trên mobile */
-  .ov {
+  /* Level-up overlay → bottom sheet trên mobile (CHỈ .ov-lvl, không ảnh hưởng Menu/Pause/Book) */
+  .ov.ov-lvl {
     align-items: flex-end;    /* anchor to bottom */
     padding: 0;
-    background: rgba(29, 27, 46, .55);  /* tối hơn để focus card */
+    background: rgba(29, 27, 46, .55);  /* tối để focus card */
     backdrop-filter: blur(2px);
   }
-  .lvbox {
+  .ov.ov-lvl .lvbox {
     width: 100%;
     background: var(--paper);
     border-radius: 20px 20px 0 0;
@@ -623,10 +623,11 @@ img { max-width: 100%; display: block; }
     max-height: 75vh;
     overflow-y: auto;
     gap: 10px;
+    margin: 0;  /* remove auto margin from desktop */
   }
-  .lvbox h2 { font-size: clamp(24px, 6vw, 34px); }
-  /* Cards horizontal scroll on mobile (không che game) */
-  .choices {
+  .ov.ov-lvl .lvbox h2 { font-size: clamp(24px, 6vw, 34px); }
+  /* Cards horizontal scroll on mobile */
+  .ov.ov-lvl .choices {
     display: flex;
     flex-direction: row;
     flex-wrap: nowrap;
@@ -635,19 +636,20 @@ img { max-width: 100%; display: block; }
     padding-bottom: 4px;
     scrollbar-width: none;
   }
-  .choices::-webkit-scrollbar { display: none; }
-  .card {
+  .ov.ov-lvl .choices::-webkit-scrollbar { display: none; }
+  .ov.ov-lvl .card {
     flex: none;
-    width: 200px; /* fixed width per card */
-    grid-template-columns: 1fr; /* reset mobile card grid */
+    width: 200px;
     padding: 12px;
     display: flex;
     flex-direction: column;
     gap: 6px;
+    /* reset grid layout */
+    grid-template-columns: 1fr;
   }
-  .card > * { grid-column: auto; } /* reset */
-  .card .ctop { grid-column: auto; grid-row: auto; flex-direction: row; }
-  .card:hover, .card:nth-child(2):hover { transform: none; }
+  .ov.ov-lvl .card > * { grid-column: auto; }
+  .ov.ov-lvl .card .ctop { grid-column: auto; grid-row: auto; flex-direction: row; }
+  .ov.ov-lvl .card:hover, .ov.ov-lvl .card:nth-child(2):hover { transform: none; }
 
   /* Loadout → horizontal scroll strip above action buttons (không che game) */
   .loadout {

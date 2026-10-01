@@ -160,10 +160,11 @@ export async function signOut() {
   await pushPlayerData().catch(() => {});
   // 2. Sign out Supabase
   await supabase.auth.signOut();
-  // 3. Clear player cache (có auth_user_id của user cũ)
-  localStorage.removeItem(PLAYER_KEY);
-  // 4. Reset anon_id → session tiếp theo là identity mới, tránh leak data
-  localStorage.removeItem(ANON_KEY);
+  // 3. Clear TẤT CẢ local state của player cũ
+  localStorage.removeItem(PLAYER_KEY);          // ss_player_v1 (cached player + auth_user_id)
+  localStorage.removeItem(ANON_KEY);            // ss_anon_id → identity mới cho session tiếp
+  localStorage.removeItem('ss_profile_v1');     // best scores, owned classes của player cũ
+  localStorage.removeItem('ss_upgrades_v1');    // gold và upgrades của player cũ
 }
 
 /** Lắng nghe thay đổi auth state */

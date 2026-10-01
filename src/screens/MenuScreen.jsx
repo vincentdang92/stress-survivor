@@ -34,6 +34,14 @@ export function MenuScreen({ onStart, onTrial, onBook, onLeaderboard, onUpgrade,
   const [editingName, setEditingName] = useState(false);
   const nameInputRef = useRef(null); // uncontrolled — không re-render khi gõ
 
+  // Reload profile khi player thay đổi (sau login/logout)
+  // signOut xóa ss_profile_v1 → cần load lại để hiện data mới
+  useEffect(() => {
+    const fresh = loadProfile();
+    setProfile(fresh);
+    setSel(fresh.owned[0] || 'developer');
+  }, [player?.id]);
+
 
   useEffect(() => {
     // Generate portraits

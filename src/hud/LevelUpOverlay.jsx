@@ -63,7 +63,7 @@ export function LevelUpOverlay() {
 
   if (!offer) return null;
   return (
-    <div class="ov">
+    <div class="ov ov-lvl">
       <div class="lvbox">
         <div class="eyebrow">Lên cấp {lvl}</div>
         <h2>Chọn <span>1 thẻ</span></h2>
