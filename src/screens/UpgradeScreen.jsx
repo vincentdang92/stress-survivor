@@ -171,56 +171,59 @@ export function UpgradeScreen({ onClose }) {
   }, []);
 
   return (
-    <div class="upgrade-screen">
-      {/* Header */}
-      <div class="upgrade-header">
-        <button class="btn" onClick={onClose}>← Quay lại</button>
-        <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 18 }}>
-          ⬆ Nâng cấp Developer
-        </span>
-        <span class="upgrade-gold">💰 {upgrades.gold} vàng</span>
-      </div>
+    <div class="ov" style={{ zIndex: 200, alignItems: 'flex-start', paddingTop: 0, overflowY: 'auto' }}>
+      <div class="upgrade-screen">
+        {/* Header */}
+        <div class="upgrade-header">
+          <button class="btn" onClick={onClose}>← Quay lại</button>
+          <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 18 }}>
+            ⬆ Nâng cấp Developer
+          </span>
+          <span class="upgrade-gold">💰 {upgrades.gold} vàng</span>
+        </div>
 
-      {/* Character portrait */}
-      <div class="upgrade-portrait">
-        <div class="big-icon">💻</div>
-        <h3>Dev Cứng Đầu</h3>
-        <p>Chiến binh văn phòng bất khuất — sống sót qua mọi deadline.</p>
-      </div>
+        {/* Character portrait */}
+        <div class="upgrade-portrait">
+          <div class="big-icon">💻</div>
+          <h3>Dev Cứng Đầu</h3>
+          <p>Chiến binh văn phòng bất khuất — sống sót qua mọi deadline.</p>
+        </div>
 
-      {/* Stat cards */}
-      <div class="upgrade-grid">
-        {STATS.map(stat => (
-          <UpgradeCard
-            key={stat.key}
-            stat={stat}
-            level={upgrades[stat.key]}
-            gold={upgrades.gold}
-            onBuy={handleBuy}
-          />
-        ))}
-      </div>
-
-      {/* Developer-specific section */}
-      <div style={{ marginTop: 16 }}>
-        <div class="eyebrow" style={{ marginBottom: 8 }}>⚙️ Nâng cấp Developer</div>
+        {/* Stat cards */}
         <div class="upgrade-grid">
-          {DEV_STATS.map(stat => (
+          {STATS.map(stat => (
             <UpgradeCard
               key={stat.key}
               stat={stat}
-              level={upgrades[stat.key] || 0}
+              level={upgrades[stat.key]}
               gold={upgrades.gold}
               onBuy={handleBuy}
             />
           ))}
         </div>
-      </div>
 
-      {/* Footer */}
-      <div class="upgrade-footer">
-        Vàng kiếm được: 5 vàng / địch hạ
+        {/* Developer-specific section */}
+        <div style={{ marginTop: 16 }}>
+          <div class="eyebrow" style={{ marginBottom: 8 }}>⚙️ Nâng cấp Developer</div>
+          <div class="upgrade-grid">
+            {DEV_STATS.map(stat => (
+              <UpgradeCard
+                key={stat.key}
+                stat={stat}
+                level={upgrades[stat.key] || 0}
+                gold={upgrades.gold}
+                onBuy={handleBuy}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div class="upgrade-footer">
+          💰 Vàng kiếm được: <b>5 vàng / địch hạ · 20 vàng / boss</b>
+        </div>
       </div>
     </div>
   );
 }
+
