@@ -54,7 +54,7 @@ function _startKeyboard() {
 // ── Public API ───────────────────────────────────────────────────────────────
 
 /** Boost Phaser lên 60fps + enable keyboard — gọi khi bắt đầu battle */
-export function startBattle(cls, seed, trial = false) {
+export function startBattle(cls, seed, trial = false, daily = false) {
   if (!phaserInstance) return;
   try {
     // Wake loop to 60fps
@@ -70,7 +70,7 @@ export function startBattle(cls, seed, trial = false) {
     phaserInstance.isPaused = false;
   } catch {}
   if (phaserInstance.scene.isActive('BattleScene')) phaserInstance.scene.stop('BattleScene');
-  phaserInstance.scene.start('BattleScene', { cls, seed, trial });
+  phaserInstance.scene.start('BattleScene', { cls, seed, trial, daily });
 }
 
 /** Throttle + disable input khi rời battle */

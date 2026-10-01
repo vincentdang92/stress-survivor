@@ -4,6 +4,7 @@ import { portraitDataURL, enemyPortraitDataURL } from '../game/art/SpriteFactory
 import { updateDisplayName } from '../supabase.js';
 import { TiltPortrait } from '../components/TiltPortrait.jsx';
 import { getUpgradeTier } from './UpgradeScreen.jsx';
+import { getDailyState, formatCountdown, getMsUntilMidnightICT, getDailyKey } from '../utils/dailySeed.js';
 
 const PLAYABLE = Object.keys(CLASSES).filter(k => !CLASSES[k].soon);
 
@@ -23,7 +24,7 @@ const SLOTS = [
   { time: '10:00', title: 'BOSS · Deadline',     sub: 'Bắn giấy tờ theo vòng, nổi điên ở 50% máu', enemies: ['boss'], boss: true },
 ];
 
-export function MenuScreen({ onStart, onTrial, onBook, onLeaderboard, onUpgrade, onAuth, player, onPlayerUpdate }) {
+export function MenuScreen({ onStart, onDailyStart, onTrial, onBook, onLeaderboard, onUpgrade, onAuth, player, onPlayerUpdate }) {
   const [profile, setProfile] = useState(loadProfile);
   const [sel, setSel] = useState(() => {
     const p = loadProfile();
@@ -33,7 +34,24 @@ export function MenuScreen({ onStart, onTrial, onBook, onLeaderboard, onUpgrade,
   const [portraits, setPortraits] = useState({});
   const [enemyPortraits, setEnemyPortraits] = useState({});
   const [editingName, setEditingName] = useState(false);
-  const nameInputRef = useRef(null); // uncontrolled — không re-render khi gõ
+  const nameInputRef = useRef(null);
+
+  // Daily challenge state
+  const [dailyState, setDailyState] = useState(() => getDailyState());
+  const [countdown, setCountdown] = useState(() => formatCountdown(getMsUntilMidnightICT()));
+
+  // Refresh daily state + countdown every 30s
+  useEffect(() => {
+    const tick = () => {
+      setDailyState(getDailyState());
+      setCountdown(formatCountdown(getMsUntilMidnightICT()));
+    };
+    const id = setInterval(tick, 30_000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Re-check daily state when returning from battle
+  useEffect(() => { setDailyState(getDailyState()); }, [player?.id]);
 
   // Reload profile khi player thay đổi (sau login/logout)
   // signOut xóa ss_profile_v1 → cần load lại để hiện data mới
@@ -121,6 +139,30 @@ export function MenuScreen({ onStart, onTrial, onBook, onLeaderboard, onUpgrade,
             Vũ khí tự bắn, bạn lo chạy, <b>tap để đập</b> và chọn thẻ ghép build.
             Bị đánh sẽ đầy <b>Stress</b>, đầy rồi thì <b>RAGE</b>.
           </p>
+
+          {/* ── Daily Challenge Banner ── */}
+          {onDailyStart && (
+            <div class="daily-banner">
+              <div class="daily-left">
+                <span class="daily-dot" />
+                <div>
+                  <div class="daily-title">📅 Thử thách hôm nay</div>
+                  <div class="daily-sub">
+                    {dailyState.played
+                      ? <>Điểm của bạn: <b>{dailyState.score.toLocaleString('vi-VN')}</b> · <span class="daily-countdown">Reset trong {countdown}</span></>
+                      : <>Fixed seed · Hôm nay chưa chơi · <span class="daily-countdown">Còn {countdown}</span></>}
+                  </div>
+                </div>
+              </div>
+              <button
+                class={`btn daily-play-btn ${dailyState.played ? '' : 'primary'}`}
+                onClick={() => { onDailyStart('developer'); }}
+              >
+                {dailyState.played ? '🔄 Chơi lại' : '▶ Chơi ngay'}
+              </button>
+            </div>
+          )}
+
           <div class="row">
             <button class="btn primary" onClick={handleStart}>Vào ca · 08:00</button>
             <button class="btn" onClick={() => onTrial(sel)}>Chơi thử 30 giây</button>

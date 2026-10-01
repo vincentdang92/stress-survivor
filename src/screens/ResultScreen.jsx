@@ -271,7 +271,14 @@ export function ResultScreen({ onRestart, onMenu, onLeaderboard, player }) {
         {/* ── Header ── */}
         <div class="res-header">
           <div>
-            <div class="eyebrow">{won ? '✅ Chiến thắng!' : '💀 Thất bại'}</div>
+            <div class="eyebrow" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              {won ? '✅ Chiến thắng!' : '💀 Thất bại'}
+              {daily && (
+                <span style={{ background: '#1D1B2E', color: '#FFD447', font: '800 9px var(--mono)', letterSpacing: '.1em', padding: '2px 7px', borderRadius: 6 }}>
+                  📅 DAILY {new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}
+                </span>
+              )}
+            </div>
             <h2 class="res-title">{won ? '🏆 Deadline đã hạ!' : '💀 Burn out!'}</h2>
             <p class="res-sub">
               {won

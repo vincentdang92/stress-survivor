@@ -13,8 +13,9 @@ import { LoadingScreen } from './screens/LoadingScreen.jsx';
 import { UpgradeScreen } from './screens/UpgradeScreen.jsx';
 import { AuthModal } from './screens/AuthModal.jsx';
 import { randomSeed } from './game/rng.js';
+import { getDailySeed, saveDailyResult } from './utils/dailySeed.js';
 import { initAudio } from './game/audio/SFX.js';
-import { getOrCreatePlayer, submitScore, initAuth, pullPlayerData } from './supabase.js';
+import { getOrCreatePlayer, submitScore, calcScore, initAuth, pullPlayerData } from './supabase.js';
 
 export function App() {
   const [screen, setScreen] = useState('menu'); // menu | battle | book | leaderboard | upgrade
@@ -100,21 +101,33 @@ export function App() {
     phaserReadyRef.current = true;
     setPhaserReady(true);
     if (pendingBattle.current) {
-      const { cls, seed, trial } = pendingBattle.current;
+      const { cls, seed, trial, daily } = pendingBattle.current;
       pendingBattle.current = null;
-      startBattle(cls, seed, trial);
+      startBattle(cls, seed, trial, daily);
     }
   }, []);
 
   const goToBattle = useCallback((cls, trial = false) => {
     initAudio();
     const seed = randomSeed();
-    setBattleConfig({ cls, seed, trial });
+    setBattleConfig({ cls, seed, trial, daily: false });
     setScreen('battle');
     if (phaserReadyRef.current) {
-      startBattle(cls, seed, trial);
+      startBattle(cls, seed, trial, false);
     } else {
-      pendingBattle.current = { cls, seed, trial };
+      pendingBattle.current = { cls, seed, trial, daily: false };
+    }
+  }, []);
+
+  const goToDailyBattle = useCallback((cls = 'developer') => {
+    initAudio();
+    const seed = getDailySeed();
+    setBattleConfig({ cls, seed, trial: false, daily: true });
+    setScreen('battle');
+    if (phaserReadyRef.current) {
+      startBattle(cls, seed, false, true);
+    } else {
+      pendingBattle.current = { cls, seed, trial: false, daily: true };
     }
   }, []);
 
@@ -140,6 +153,12 @@ export function App() {
           return;
         }
         if (!data.won && !data.stats) return;
+
+        // Save daily result if this was a daily challenge
+        if (data.daily) {
+          const s = calcScore({ kills: data.stats?.kills, dmgDealt: data.stats?.dmg, maxCombo: data.stats?.combo, won: data.won });
+          saveDailyResult(s);
+        }
 
         // Submit score (fire & forget, doesn't block UI)
         submitScore({
@@ -185,6 +204,7 @@ export function App() {
         <MenuScreen
           player={player}
           onStart={cls => goToBattle(cls, false)}
+          onDailyStart={goToDailyBattle}
           onTrial={cls => goToBattle(cls, true)}
           onBook={() => setScreen('book')}
           onLeaderboard={() => setScreen('leaderboard')}

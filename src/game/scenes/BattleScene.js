@@ -25,6 +25,7 @@ export class BattleScene extends Phaser.Scene {
     this.cls = data.cls || 'developer';
     this.seed = data.seed || (Math.random() * 0xFFFFFFFF) >>> 0;
     this.trial = data.trial || false;
+    this.daily = data.daily || false;
   }
 
   create() {
@@ -119,34 +120,162 @@ export class BattleScene extends Phaser.Scene {
     this.floorGfx = this.add.graphics();
     this._drawFloor();
 
-    // Desks scattered around world
+    // Desks scattered around world — fixed positions for consistent layout
     this.desks = [];
     const positions = [
       [-400, -300], [200, -350], [-100, 100], [350, 200], [-350, 200],
-      [0, -100], [150, -150], [-200, 0], [300, -100], [-300, 300],
+      [0, -100],    [150, -150], [-200, 0],   [300, -100],[-300, 300],
+      [80, 280],    [-80, -280], [420, -220], [-420, 120], [250, -50],
     ];
     for (const [x, y] of positions) {
-      this.desks.push({ x: x + WORLD / 2, y: y + WORLD / 2, seed: (this.rng.next() * 0xFFFFFF) | 0 });
+      const sx = this.rng.next();
+      this.desks.push({
+        x: x + WORLD,
+        y: y + WORLD,
+        seed: sx,
+        // Randomly vary each desk
+        rot: Math.floor(sx * 4) * (Math.PI / 2),  // 0, 90, 180, 270 deg
+        type: Math.floor(sx * 3),                   // 0=normal, 1=plant, 2=L-shape
+        hasCoffee: sx > 0.5,
+      });
     }
+    this._drawDesks(); // draw static desk art onto floorGfx
   }
 
   _drawFloor() {
     const g = this.floorGfx;
     g.clear();
-    // Background
-    g.fillStyle(0xE7EDF5); g.fillRect(0, 0, WORLD * 2, WORLD * 2);
-    // Grid lines
-    g.lineStyle(1, 0xD3D9E6, 0.5);
-    for (let x = 0; x < WORLD * 2; x += 80) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, WORLD * 2); g.strokePath(); }
-    for (let y = 0; y < WORLD * 2; y += 80) { g.beginPath(); g.moveTo(0, y); g.lineTo(WORLD * 2, y); g.strokePath(); }
-    // Carpet patches
-    const carpetColors = [0xFFD447, 0x2EC4B6, 0xE8E4F2];
+    const W2 = WORLD * 2;
+
+    // ── Base floor ─────────────────────────────────────────────────────
+    g.fillStyle(0xEDF1F7); g.fillRect(0, 0, W2, W2);
+
+    // ── Fine tile grid (subtle) ────────────────────────────────────────
+    g.lineStyle(0.8, 0xC8D2E0, 0.35);
+    for (let x = 0; x < W2; x += 60) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, W2); g.strokePath(); }
+    for (let y = 0; y < W2; y += 60) { g.beginPath(); g.moveTo(0, y); g.lineTo(W2, y); g.strokePath(); }
+
+    // ── Room zones ─────────────────────────────────────────────────────
+    // Meeting room (top-left)
+    g.fillStyle(0xE0E8F5, 0.7); g.fillRoundedRect(WORLD - 580, WORLD - 560, 300, 260, 4);
+    g.lineStyle(3, 0xBCC8DC, 0.5); g.strokeRoundedRect(WORLD - 580, WORLD - 560, 300, 260, 4);
+    // Meeting table inside
+    g.fillStyle(0xC8B89A, 0.55); g.fillEllipse(WORLD - 430, WORLD - 430, 200, 110);
+    g.lineStyle(2, 0x8B7355, 0.4); g.strokeEllipse(WORLD - 430, WORLD - 430, 200, 110);
+
+    // Server room (bottom-right)
+    g.fillStyle(0x1D1B2E, 0.06); g.fillRoundedRect(WORLD + 260, WORLD + 240, 240, 220, 4);
+    g.lineStyle(2, 0x2EC4B6, 0.25); g.strokeRoundedRect(WORLD + 260, WORLD + 240, 240, 220, 4);
+    // Server racks inside
+    for (let i = 0; i < 3; i++) {
+      g.fillStyle(0x3A3856, 0.5);
+      g.fillRoundedRect(WORLD + 275 + i * 70, WORLD + 255, 55, 190, 3);
+    }
+
+    // Break room (bottom-left)
+    g.fillStyle(0xFFF8E6, 0.6); g.fillRoundedRect(WORLD - 560, WORLD + 260, 260, 220, 4);
+    g.lineStyle(2, 0xFFD447, 0.3); g.strokeRoundedRect(WORLD - 560, WORLD + 260, 260, 220, 4);
+
+    // ── Window light shafts (world edges) ─────────────────────────────
+    const winAlpha = 0.08;
+    g.fillStyle(0xADD8E6, winAlpha);
+    // Top windows
+    for (let i = 0; i < 5; i++) g.fillRect(WORLD * 0.2 + i * 300, 0, 160, 80);
+    // Bottom windows
+    for (let i = 0; i < 5; i++) g.fillRect(WORLD * 0.2 + i * 300, W2 - 80, 160, 80);
+    // Light shafts from top windows
+    g.fillStyle(0xFFFFFF, 0.04);
+    for (let i = 0; i < 5; i++) {
+      const wx = WORLD * 0.2 + i * 300 + 80;
+      g.fillTriangle(wx - 80, 0, wx + 80, 0, wx + 140, 300, wx - 140, 300);
+    }
+
+    // ── Carpet patches ─────────────────────────────────────────────────
+    const carpetColors = [0xFFD447, 0x2EC4B6, 0xE8E4F2, 0xFF8A3D, 0x7B5CFF];
     const cr = this.rng;
-    for (let i = 0; i < 8; i++) {
-      const cx = cr.range(100, WORLD * 2 - 100), cy = cr.range(100, WORLD * 2 - 100);
-      const cw = cr.range(120, 220), ch = cr.range(80, 160);
-      g.fillStyle(carpetColors[i % 3], 0.18);
-      g.fillRoundedRect(cx - cw / 2, cy - ch / 2, cw, ch, 14);
+    for (let i = 0; i < 6; i++) {
+      const cx = cr.range(200, W2 - 200), cy = cr.range(200, W2 - 200);
+      const cw = cr.range(100, 200), ch = cr.range(70, 130);
+      g.fillStyle(carpetColors[i % carpetColors.length], 0.12);
+      g.fillRoundedRect(cx - cw / 2, cy - ch / 2, cw, ch, 12);
+    }
+
+    // ── Room labels (tiny, drawn as dots pattern) ─────────────────────
+    // (text not possible on Graphics — labels conveyed via floor color)
+  }
+
+  _drawDesks() {
+    const g = this.floorGfx;
+
+    for (const desk of this.desks) {
+      const { x, y, type, rot, hasCoffee } = desk;
+      const cos = Math.cos(rot), sin = Math.sin(rot);
+
+      // Helper: rotated rect around desk center
+      const drawRect = (ox, oy, w, h, col, alpha = 1) => {
+        const rx = x + ox * cos - oy * sin;
+        const ry = y + ox * sin + oy * cos;
+        g.fillStyle(col, alpha);
+        g.fillRoundedRect(rx - w / 2, ry - h / 2, w, h, 3);
+      };
+      const strokeRect = (ox, oy, w, h, col, lw = 1.5) => {
+        const rx = x + ox * cos - oy * sin;
+        const ry = y + ox * sin + oy * cos;
+        g.lineStyle(lw, col, 0.7);
+        g.strokeRoundedRect(rx - w / 2, ry - h / 2, w, h, 3);
+      };
+
+      if (type === 1) {
+        // ── Plant ──────────────────────────────────────────────────
+        // Pot
+        g.fillStyle(0xD2691E, 0.8); g.fillEllipse(x, y + 10, 28, 16);
+        g.fillStyle(0xA0522D, 0.7); g.fillRect(x - 10, y, 20, 10);
+        // Leaves
+        const leafColors = [0x2D8A4E, 0x3DAA5E, 0x1F6B38];
+        for (let i = 0; i < 5; i++) {
+          const la = (i / 5) * TAU + rot;
+          const lr = 8 + (desk.seed * 17 + i) % 8;
+          g.fillStyle(leafColors[i % 3], 0.85);
+          g.fillEllipse(x + Math.cos(la) * lr, y - 8 + Math.sin(la) * 5, 18, 14);
+        }
+        continue;
+      }
+
+      // ── Desk surface ────────────────────────────────────────────
+      const DW = type === 2 ? 100 : 80, DH = 50;
+      // Shadow
+      g.fillStyle(0x1D1B2E, 0.08);
+      g.fillRoundedRect(x - DW / 2 + 4, y - DH / 2 + 4, DW, DH, 4);
+      // Surface
+      g.fillStyle(0xD4B896, 0.9);
+      g.fillRoundedRect(x - DW / 2, y - DH / 2, DW, DH, 4);
+      g.lineStyle(1.5, 0x8B6914, 0.4);
+      g.strokeRoundedRect(x - DW / 2, y - DH / 2, DW, DH, 4);
+
+      // Monitor stand (small rect below monitor)
+      drawRect(type === 2 ? -16 : 0, -8, 6, 10, 0x555566, 0.7);
+      // Monitor back (shadow)
+      drawRect(type === 2 ? -16 : 0, -18, 34, 22, 0x333344, 0.6);
+      // Monitor bezel
+      drawRect(type === 2 ? -16 : 0, -18, 30, 20, 0x444455, 0.9);
+      // Screen (will glow in _render)
+      drawRect(type === 2 ? -16 : 0, -18, 26, 16, 0x0A0E1A, 1.0);
+
+      // Keyboard
+      drawRect(type === 2 ? 18 : 0, 8, 36, 12, 0xBBBBCC, 0.7);
+
+      // Coffee cup
+      if (hasCoffee) {
+        const coffeeX = x + (type === 2 ? 32 : 28) * cos;
+        const coffeeY = y + (type === 2 ? 32 : 28) * sin;
+        g.fillStyle(0xCC8855, 0.85); g.fillCircle(coffeeX, coffeeY, 6);
+        g.lineStyle(1, 0x8B5513, 0.6); g.strokeCircle(coffeeX, coffeeY, 6);
+        // Hot line top
+        g.fillStyle(0x4A2800, 0.5); g.fillCircle(coffeeX, coffeeY, 4);
+        // Remember coffee pos for steam animation
+        desk.coffeeX = coffeeX;
+        desk.coffeeY = coffeeY;
+      }
     }
   }
 
@@ -1306,6 +1435,7 @@ export class BattleScene extends Phaser.Scene {
     if (won) SFX.win(); else SFX.lose();
     bus.emit('BATTLE_COMPLETED', {
       won, trial,
+      daily: this.daily,
       cls: this.cls,
       stats: {
         kills: this.kills, combo: this.maxCombo,
@@ -1365,6 +1495,44 @@ export class BattleScene extends Phaser.Scene {
       g.fillStyle(d.color, 0.5 * (d.life / 6)); g.fillCircle(d.x, d.y, d.r);
     }
     this.decals = this.decals.filter(d => (d.life -= 0.016) > 0);
+
+    // ── Animated desk elements ──────────────────────────────────────
+    const t = this.elapsed;
+    for (let i = 0; i < this.desks.length; i++) {
+      const desk = this.desks[i];
+      if (desk.type === 1) continue; // plants have no screen
+
+      const phase = i * 1.37; // each desk out of phase
+      const cos = Math.cos(desk.rot), sin = Math.sin(desk.rot);
+      const monOX = desk.type === 2 ? -16 : 0;
+      const monX = desk.x + monOX * cos;
+      const monY = desk.y + monOX * sin - 18;
+
+      // Monitor screen glow (pulsing teal/blue)
+      const glow = 0.12 + Math.sin(t * 0.9 + phase) * 0.06;
+      const screenColor = desk.seed > 0.6 ? 0x2EC4B6 : desk.seed > 0.3 ? 0x7B5CFF : 0x3A8AFF;
+      g.fillStyle(screenColor, glow);
+      g.fillRoundedRect(monX - 13, monY - 8, 26, 16, 2);
+
+      // Occasional "blink" — simulate screen content flash
+      if (Math.sin(t * 3.1 + phase * 2) > 0.97) {
+        g.fillStyle(0xFFFFFF, 0.08);
+        g.fillRoundedRect(monX - 13, monY - 8, 26, 4, 1);
+      }
+
+      // Coffee steam (only desks with coffee cups)
+      if (desk.coffeeX !== undefined) {
+        for (let s = 0; s < 3; s++) {
+          const sp = (t * 0.8 + s * 0.5 + phase) % 2.0; // 0 → 2 cycle
+          if (sp > 1.2) continue; // only visible phase
+          const sy = desk.coffeeY - 6 - sp * 18;
+          const sx2 = desk.coffeeX + Math.sin(t * 2 + s * 1.8 + phase) * 3;
+          const sa = (1 - sp / 1.2) * 0.22;
+          g.fillStyle(0xFFFFFF, sa);
+          g.fillCircle(sx2, sy, 2.5 + sp * 1.5);
+        }
+      }
+    }
 
     // ── Burn zones ────────────────────────────────────────────────
     for (const z of this.zones) {
