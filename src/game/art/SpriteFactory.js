@@ -417,62 +417,68 @@ export function registerTextures(scene) {
 
   // Projectiles
   if (!scene.textures.exists('staple')) {
-    const sc = document.createElement('canvas'); sc.width = 16; sc.height = 8;
+    const sc = document.createElement('canvas'); sc.width = 16; sc.height = 7;
     const sg = sc.getContext('2d');
     // Shadow
-    sg.fillStyle = '#1D1B2E'; sg.globalAlpha = 0.3;
-    sg.fillRoundedRect(3, 2, 12, 5, 2); sg.globalAlpha = 1;
-    // Body (warm metallic)
-    sg.fillStyle = '#D0C8B0'; sg.strokeStyle = C.INK; sg.lineWidth = 1.5;
-    sg.beginPath(); sg.roundRect(1, 1, 13, 5, 2); sg.fill(); sg.stroke();
-    // Shine highlight line
-    sg.strokeStyle = '#FFF8E0'; sg.lineWidth = 0.8; sg.globalAlpha = 0.8;
-    sg.beginPath(); sg.moveTo(2, 2.5); sg.lineTo(13, 2.5); sg.stroke();
-    sg.globalAlpha = 1;
+    sg.fillStyle = 'rgba(29,27,46,0.28)'; sg.fillRect(3, 3, 11, 4);
+    // Body (warm metallic) — manual rounded rect (safe for all browsers)
+    sg.fillStyle = '#D0C8B0';
+    sg.beginPath();
+    sg.moveTo(3, 1); sg.lineTo(13, 1); sg.arcTo(14, 1, 14, 2, 2);
+    sg.lineTo(14, 4); sg.arcTo(14, 5, 13, 5, 2);
+    sg.lineTo(3, 5); sg.arcTo(1, 5, 1, 4, 2);
+    sg.lineTo(1, 2); sg.arcTo(1, 1, 3, 1, 2); sg.closePath();
+    sg.fill();
+    sg.strokeStyle = C.INK; sg.lineWidth = 1.5; sg.stroke();
+    // Shine
+    sg.strokeStyle = 'rgba(255,248,224,0.75)'; sg.lineWidth = 0.8;
+    sg.beginPath(); sg.moveTo(2, 2.2); sg.lineTo(13, 2.2); sg.stroke();
     scene.textures.addCanvas('staple', sc);
   }
   if (!scene.textures.exists('plane')) {
-    const pc = document.createElement('canvas'); pc.width = 28; pc.height = 18;
+    const pc = document.createElement('canvas'); pc.width = 26; pc.height = 16;
     const pg = pc.getContext('2d');
-    pg.translate(14, 9);
+    pg.translate(13, 8);
     // Glow halo
-    pg.globalAlpha = 0.25; pg.fillStyle = '#2EC4B6';
-    pg.beginPath(); pg.ellipse(0, 0, 12, 8, 0, 0, TAU); pg.fill(); pg.globalAlpha = 1;
+    pg.globalAlpha = 0.22; pg.fillStyle = '#2EC4B6';
+    pg.beginPath(); pg.ellipse(0, 0, 11, 7, 0, 0, TAU); pg.fill(); pg.globalAlpha = 1;
     // Body — teal plane
     pg.beginPath(); pg.moveTo(-11, 2.5); pg.lineTo(11, 0); pg.lineTo(-11, -2.5); pg.closePath();
     pg.fillStyle = '#2EC4B6'; pg.fill(); pg.strokeStyle = C.INK; pg.lineWidth = 1.5; pg.stroke();
     // Engine glow at tail
-    pg.globalAlpha = 0.7; pg.fillStyle = '#FFFFFF';
-    pg.beginPath(); pg.ellipse(-10, 0, 3, 1.8, 0, 0, TAU); pg.fill(); pg.globalAlpha = 1;
+    pg.globalAlpha = 0.65; pg.fillStyle = '#FFFFFF';
+    pg.beginPath(); pg.ellipse(-9.5, 0, 2.5, 1.5, 0, 0, TAU); pg.fill(); pg.globalAlpha = 1;
     scene.textures.addCanvas('plane', pc);
   }
   if (!scene.textures.exists('spark')) {
     const kc = document.createElement('canvas'); kc.width = 12; kc.height = 12;
     const kg = kc.getContext('2d'); kg.translate(6, 6);
     // Outer glow
-    kg.globalAlpha = 0.3; kg.fillStyle = '#2EC4B6';
-    circ(kg, 0, 0, 5.5); kg.fill(); kg.globalAlpha = 1;
+    kg.globalAlpha = 0.28; kg.fillStyle = '#2EC4B6';
+    kg.beginPath(); kg.arc(0, 0, 5.5, 0, TAU); kg.fill(); kg.globalAlpha = 1;
     // Main body
-    circ(kg, 0, 0, 4); kg.fillStyle = '#80FFFF'; kg.fill();
+    kg.beginPath(); kg.arc(0, 0, 3.8, 0, TAU);
+    kg.fillStyle = '#80FFFF'; kg.fill();
     kg.strokeStyle = C.INK; kg.lineWidth = 1.4; kg.stroke();
     // White core
-    circ(kg, 0, 0, 1.8); kg.fillStyle = '#FFFFFF'; kg.fill();
+    kg.beginPath(); kg.arc(0, 0, 1.6, 0, TAU); kg.fillStyle = '#FFFFFF'; kg.fill();
     scene.textures.addCanvas('spark', kc);
   }
 
-  // Particle (circle) — orange for coffee/deploy
+  // Particle (dot) — orange for coffee/deploy
   if (!scene.textures.exists('dot')) {
     const dc = document.createElement('canvas'); dc.width = dc.height = 12;
     const dg = dc.getContext('2d');
     // Outer glow
-    dg.globalAlpha = 0.3; dg.fillStyle = '#FF8A3D';
+    dg.globalAlpha = 0.28; dg.fillStyle = '#FF8A3D';
     dg.beginPath(); dg.arc(6, 6, 5.5, 0, TAU); dg.fill(); dg.globalAlpha = 1;
     // Core ball
-    dg.fillStyle = '#FF8A3D'; dg.beginPath(); dg.arc(6, 6, 4, 0, TAU); dg.fill();
+    dg.fillStyle = '#FF8A3D';
+    dg.beginPath(); dg.arc(6, 6, 3.8, 0, TAU); dg.fill();
     dg.strokeStyle = '#CC4400'; dg.lineWidth = 1.2; dg.stroke();
     // Shine
-    dg.globalAlpha = 0.6; dg.fillStyle = '#FFCC99';
-    dg.beginPath(); dg.arc(4.5, 4.5, 1.5, 0, TAU); dg.fill(); dg.globalAlpha = 1;
+    dg.globalAlpha = 0.55; dg.fillStyle = '#FFCC99';
+    dg.beginPath(); dg.arc(4.5, 4.5, 1.4, 0, TAU); dg.fill(); dg.globalAlpha = 1;
     scene.textures.addCanvas('dot', dc);
   }
 }
