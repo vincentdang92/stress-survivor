@@ -2,12 +2,13 @@
 
 // ── Enemies ───────────────────────────────────────────────────────────────
 export const ENEMIES = {
-  email:    { r: 13, hp: 12,   spd: 92,  dmg: 8,  xp: 1, kb: 1,    color: '#9FB4FF', bug: false, charge: false, boss: false },
-  notif:    { r: 11, hp: 6,    spd: 132, dmg: 5,  xp: 1, kb: 1.2,  color: '#FFD447', bug: false, charge: false, boss: false },
-  meeting:  { r: 20, hp: 62,   spd: 52,  dmg: 14, xp: 3, kb: 0.45, color: '#E8E4F2', bug: false, charge: false, boss: false },
-  bug:      { r: 15, hp: 28,   spd: 80,  dmg: 10, xp: 2, kb: 0.8,  color: '#7FD66B', bug: true,  charge: false, boss: false },
-  customer: { r: 18, hp: 46,   spd: 68,  dmg: 16, xp: 3, kb: 0.6,  color: '#FF7A45', bug: false, charge: true,  boss: false },
-  boss:     { r: 46, hp: 3600, spd: 46,  dmg: 24, xp: 0, kb: 0.04, color: '#FF4D6D', bug: false, charge: false, boss: true  },
+  // Stats per GDD: HP/spd/dmg/xp aligned to design doc
+  email:    { r: 13, hp: 10,   spd: 90,  dmg: 5,  xp: 1, kb: 1,    color: '#9FB4FF', bug: false, charge: false, boss: false },
+  notif:    { r: 11, hp: 6,    spd: 160, dmg: 3,  xp: 1, kb: 1.2,  color: '#FFD447', bug: false, charge: false, boss: false },
+  meeting:  { r: 22, hp: 68,   spd: 70,  dmg: 8,  xp: 3, kb: 0.45, color: '#E8E4F2', bug: false, charge: false, boss: false },
+  bug:      { r: 15, hp: 25,   spd: 110, dmg: 6,  xp: 2, kb: 0.8,  color: '#7FD66B', bug: true,  charge: false, boss: false },
+  customer: { r: 18, hp: 120,  spd: 68,  dmg: 18, xp: 6, kb: 0.6,  color: '#FF7A45', bug: false, charge: true,  boss: false },
+  boss:     { r: 46, hp: 6000, spd: 46,  dmg: 24, xp: 0, kb: 0.04, color: '#FF4D6D', bug: false, charge: false, boss: true  },
 };
 
 // HP scales over time: hp × (1 + seconds/95), capped at 170 enemies
@@ -28,16 +29,18 @@ const dv = (base, lv) => Math.round(base * (1 + 0.25 * (lv - 1)));
 
 export const CARDS = [
   {
-    id: 'stapler', icon: '📎', name: 'Bấm Ghim Liên Thanh',
-    type: 'weapon', rarity: 'common', tags: ['office', 'speed'],
-    cd: l => 0.5 - l * 0.02,
-    desc: l => `Bắn ${l >= 5 ? 3 : l >= 3 ? 2 : 1} ghim vào địch gần nhất, ${dv(9, l)} sát thương mỗi ghim.`,
+    // GDD name: Syntax Shot (starting weapon)
+    id: 'stapler', icon: '⌨️', name: 'Syntax Shot',
+    type: 'weapon', rarity: 'common', tags: ['developer', 'speed'],
+    cd: l => 0.8 - l * 0.07,
+    desc: l => `Tự bắn ${l >= 5 ? 2 : 1} ký tự code ({} ; </> =>) vào địch gần nhất, ${dv(12, l)} sát thương.${l >= 5 ? ' Xuyên 2.' : ''}`,
   },
   {
-    id: 'plane', icon: '✈️', name: 'Máy Bay Giấy',
-    type: 'weapon', rarity: 'common', tags: ['office', 'pierce'],
+    // GDD name: Git Push (pierce beam in facing direction)
+    id: 'plane', icon: '📤', name: 'Git Push',
+    type: 'weapon', rarity: 'common', tags: ['developer', 'pierce'],
     cd: l => 1.15 - l * 0.05,
-    desc: l => `Phóng máy bay theo hướng chạy, xuyên ${2 + l} địch, ${dv(18, l)} sát thương.`,
+    desc: l => `Bắn luồng code theo hướng chạy, xuyên ${2 + l} địch, ${dv(18, l)} sát thương.`,
   },
   {
     id: 'coffee', icon: '💣', name: 'Bom Cà Phê',
@@ -46,16 +49,18 @@ export const CARDS = [
     desc: l => `Ném ly cà phê nổ bán kính ${70 + 10 * l}, ${dv(28, l)} sát thương, để lại vũng bỏng.${l >= 4 ? ' Ném 2 ly.' : ''}`,
   },
   {
-    id: 'keyboard', icon: '⌨️', name: 'Đập Bàn Phím',
-    type: 'weapon', rarity: 'common', tags: ['rage', 'aoe'],
+    // GDD name: Bàn phím cơ (AOE cone in facing direction)
+    id: 'keyboard', icon: '⌨️', name: 'Bàn Phím Cơ',
+    type: 'weapon', rarity: 'common', tags: ['developer', 'aoe'],
     cd: l => 2.9 - l * 0.12,
-    desc: l => `Sóng chấn động bán kính ${100 + 15 * l}, ${dv(22, l)} sát thương, đẩy lùi và xoá đạn địch.`,
+    desc: l => `Sóng âm bán kính ${100 + 15 * l}, ${dv(22, l)} sát thương, đẩy lùi và xoá đạn địch.`,
   },
   {
-    id: 'mouse', icon: '🖱️', name: 'Chuột Không Dây',
+    // GDD name: Rubber Duck (orbit weapon)
+    id: 'mouse', icon: '🦆', name: 'Rubber Duck',
     type: 'weapon', rarity: 'rare', tags: ['developer', 'orbit'],
     cd: null,
-    desc: l => `${l >= 5 ? 4 : l >= 3 ? 3 : 2} con chuột bay quanh người, ${dv(11, l)} sát thương mỗi lần chạm.`,
+    desc: l => `${l >= 5 ? 4 : l >= 3 ? 3 : 2} vịt gỗ bay quanh người, ${dv(10, l)} sát thương/chạm. Debug Mode x3 trên BUG.`,
   },
   {
     id: 'hotfix', icon: '🩹', name: 'Hotfix Lúc 2 Giờ Sáng',
@@ -157,10 +162,10 @@ export const CLASSES = {
   developer: {
     name: 'Developer', line: 'Sống bằng cà phê và Stack Overflow.',
     start: 'stapler', bias: 'developer',
-    passive: 'Debug Mode', pdesc: '+30% sát thương lên địch BUG.',
-    tap: 'Gõ phím: mỗi tap bắn một ký tự code về điểm chạm. Đủ 20 tap thì COMPILE, bắn 16 ký tự ra xung quanh.',
+    passive: 'Debug Mode', pdesc: '+30% sát thương lên địch BUG. Rubber Duck gây x3 lên BUG.',
+    tap: 'Tap trúng địch: 8 sát thương + cộng 1 ô COMPILE (20 ô). Đủ 20 ô → COMPILE: bắn 16 ký tự tỏa tròn, 20 sát thương + đẩy lùi 60px. Ở Overload (90%+): 10% Build failed!',
     lore: 'Một developer full-stack thứ thiệt. Uống cà phê thay nước, ngủ cùng bug, và tự hào về commit "fix typo" lúc 3 giờ sáng.',
-    weapons: ['stapler', 'mouse', 'hotfix', 'terminal', 'deploy'],
+    weapons: ['stapler', 'mouse', 'hotfix', 'terminal', 'deploy', 'keyboard', 'plane'],
     passives: ['rubber_duck', 'glasses', 'espresso'],
     soon: false,
   },
@@ -193,8 +198,8 @@ export const CLASSES = {
   },
 };
 
-// ── EXP formula ──────────────────────────────────────────────────────────
-export const nextXp = l => Math.round(6 + 4 * l + 0.4 * l * l);
+// GDD XP formula: 5+4*(l-1) to level 20, then +8 per level after
+export const nextXp = l => l <= 20 ? (5 + 4 * (l - 1)) : (81 + 8 * (l - 20));
 
 // ── Card rarity weights ──────────────────────────────────────────────────
 export const RARITY_WEIGHT = { common: 6, rare: 3.2, epic: 1.6 };

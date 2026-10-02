@@ -288,6 +288,8 @@ export class BattleScene extends Phaser.Scene {
       lvl: 1, xp: 0, nextXp: nextXp(1),
       dashCd: 0, dashT: 0, dvx: 0, dvy: 0,
       rage: 0, hitFlash: 0, invincible: 0,
+      exhausted: 0, exhaustAfterRage: false, // GDD: exhausted state after auto-RAGE
+      lastHitTime: -999,                      // GDD: no-hit stress recovery tracking
       moving: false, bob: 0,
       fx: 1, fy: 0, // facing direction
       // class-specific
@@ -548,7 +550,11 @@ export class BattleScene extends Phaser.Scene {
   _updatePlayer(dt) {
     const p = this.player;
     const st = this.stats;
-    const spd = 160 * st.moveMul * (p.rage > 0 ? 1.2 : 1);
+    // Base speed per GDD: 220 px/s
+    // Adrenaline speed bonus: +10% at 75-99% stress
+    const adrSpd = (p.stress >= 75 && p.stress < 100 && p.rage <= 0) ? 1.10 : 1.0;
+    const exhaustPenalty = (p.exhausted > 0) ? 0.60 : 1.0;
+    const spd = 220 * st.moveMul * adrSpd * exhaustPenalty * (p.rage > 0 ? 1.15 : 1);
 
     // Movement
     let mx = 0, my = 0;
@@ -579,8 +585,20 @@ export class BattleScene extends Phaser.Scene {
       if (p.dashT <= 0) p.dashT = 0;
     }
 
-    // Rage countdown
-    if (p.rage > 0) { p.rage -= dt; if (p.rage < 0) p.rage = 0; }
+    // Rage countdown — track exhaustion on auto-RAGE expiry
+    if (p.rage > 0) {
+      p.rage -= dt;
+      if (p.rage <= 0) {
+        p.rage = 0;
+        if (p.exhaustAfterRage) {
+          p.exhausted = 4;
+          p.exhaustAfterRage = false;
+          this._showBanner('KIỆT SỨC', 'Tốc độ −40% trong 4s', 'wave');
+        }
+      }
+    }
+    // Exhausted countdown
+    if (p.exhausted > 0) p.exhausted -= dt;
 
     // Hit flash
     if (p.hitFlash > 0) p.hitFlash -= dt;
@@ -598,7 +616,9 @@ export class BattleScene extends Phaser.Scene {
   _updateWeapons(dt) {
     const p = this.player;
     const st = this.stats;
-    const spdMul = st.atkSpd * (p.rage > 0 ? 1.6 : 1);
+    // Attack speed: Adrenaline zone adds +10% at 75%+ stress; RAGE doubles fire rate per GDD
+    const adrAtkSpd = (p.stress >= 75 && p.stress < 100 && p.rage <= 0) ? 1.10 : 1.0;
+    const spdMul = st.atkSpd * adrAtkSpd * (p.rage > 0 ? 2.0 : 1);
 
     for (const id of Object.keys(this.cards)) {
       const c = CARD[id];
@@ -1013,18 +1033,33 @@ export class BattleScene extends Phaser.Scene {
   _updateStress(dt) {
     const p = this.player;
     const st = this.stats;
-    // Passive stress gain
-    p.stress += 0.45 * dt * st.stressGain;
-    // Combo bonus
-    if (this.combo > 0 && this.combo % 10 === 0) p.stress += 6 * st.stressGain;
+
+    // Passive stress build (office pressure) — GDD implies constant pressure
+    p.stress += 0.28 * dt * st.stressGain;
+
+    // Surrounded: +1/s when >30 enemies in 300px (GDD)
+    const nearCount = this.enemies.filter(e => !e.dead && Math.hypot(e.x - p.x, e.y - p.y) < 300).length;
+    if (nearCount > 30) p.stress += 1 * dt * st.stressGain;
+
+    // Combo stress bonus (kill streak reward — game feel)
+    if (this.combo > 0 && this.combo % 10 === 0) p.stress += 5 * st.stressGain * dt * 0.05;
+
+    // No-hit stress recovery: -0.5/s after 5s without being hit (GDD)
+    if (p.rage <= 0 && this.elapsed - p.lastHitTime >= 5 && p.stress > 0) {
+      p.stress = Math.max(0, p.stress - 0.5 * dt);
+    }
+
     p.stress = Phaser.Math.Clamp(p.stress, 0, 100);
 
-    // Rage drain
+    // RAGE drain (during rage, stress falls to 0)
     if (p.rage > 0) { p.stress -= (100 / 7) * dt; p.stress = Math.max(0, p.stress); }
 
-    if (p.stress >= 100 && !this.rageReadyShown) {
+    // Auto-RAGE trigger at 100% (GDD: "RAGE auto-activates when stress hits 100%")
+    if (p.stress >= 100 && p.rage <= 0 && !this.rageReadyShown) {
       this.rageReadyShown = true;
       bus.emit('RAGE_READY', {});
+      // Auto-trigger full RAGE (6s, then exhaustion)
+      this._doRage(true);
     }
   }
 
@@ -1140,6 +1175,9 @@ export class BattleScene extends Phaser.Scene {
       const gameSec = Math.floor(t % 60);
       const gameHr = 8 + Math.floor(t / 60);
       const clockStr = `${String(gameHr).padStart(2, '0')}:${String(gameSec).padStart(2, '0')}`;
+      // Stress zone labels (GDD)
+      const sz = p.stress >= 100 ? 'rage' : p.stress >= 90 ? 'overload' : p.stress >= 50 ? 'adrenaline' : 'calm';
+      const compileMax = Math.max(8, 20 - (this.stats.devCompileBonus || 0));
       bus.emit('HUD_TICK', {
         hp: p.hp, maxHp: p.maxHp, stress: p.stress,
         lvl: p.lvl, xp: p.xp, nextXp: p.nextXp,
@@ -1147,7 +1185,10 @@ export class BattleScene extends Phaser.Scene {
         combo: this.combo, rageActive: p.rage > 0, rageCd: p.dashCd,
         dashCd: p.dashCd, clock: clockStr,
         wave: WAVES[this.waveIdx]?.name || '',
-        rageReady: p.stress >= 100,
+        rageReady: p.stress >= 80,   // GDD: manual RAGE available at 80%
+        stressZone: sz,
+        compilePct: this.cls === 'developer' ? (this.devTaps || 0) / compileMax : 0,
+        exhausted: p.exhausted > 0,
       });
     }
   }
@@ -1156,7 +1197,18 @@ export class BattleScene extends Phaser.Scene {
   _hurtEnemy(e, baseDmg, opts = {}) {
     if (e.dead) return;
     const st = this.stats;
-    let d = baseDmg * st.dmgMul * (this.player.rage > 0 ? 1.5 : 1);
+    const stress = this.player.stress;
+
+    // Adrenaline zone: 50-89% stress → up to +40% damage (GDD)
+    let adrenalineMul = 1;
+    if (stress >= 50 && this.player.rage <= 0) {
+      adrenalineMul = 1 + Math.min(0.40, (stress - 50) * 0.01);
+    }
+
+    // RAGE: x2.5 (GDD). No adrenaline bonus during RAGE (it replaces it)
+    const rageMul = this.player.rage > 0 ? 2.5 : 1;
+
+    let d = baseDmg * st.dmgMul * adrenalineMul * rageMul;
     if (e.T.bug) d *= st.bugMul * (opts.bugX || 1);
     if (this.cls === 'manager' && e.stamps > 0) d *= 1.15;
     const crit = this.rng.next() < st.crit;
@@ -1254,8 +1306,10 @@ export class BattleScene extends Phaser.Scene {
     const st = this.stats;
     const actual = Math.max(1, Math.round(dmg * (1 - st.dr)));
     p.hp -= actual;
-    p.stress = Math.min(100, p.stress + actual * 1.4 * st.stressGain);
+    // GDD: +0.4 stress per 1 damage received (was 1.4 — too high)
+    p.stress = Math.min(100, p.stress + actual * 0.4 * st.stressGain);
     p.hitFlash = 0.15; p.invincible = 0.3;
+    p.lastHitTime = this.elapsed; // for no-hit stress recovery
     this.cameras.main.shake(120, 0.006);
     SFX.hurt();
     if (p.hp <= 0) { p.hp = 0; this._endBattle(false); }
@@ -1301,23 +1355,61 @@ export class BattleScene extends Phaser.Scene {
   }
 
   _devTap(wx, wy) {
-    const dmg = 12 + this.stats.dmgMul * 3;
+    const p = this.player;
+    // GDD: 8 damage per tap
+    const dmg = Math.round(8 * this.stats.dmgMul);
+
+    // Check if tap hits any enemy (GDD: only HITS count toward COMPILE)
+    let hitEnemy = false;
     for (const e of this.enemies) {
       if (e.dead) continue;
-      if (Math.hypot(e.x - wx, e.y - wy) < e.r + 30) { this._hurtEnemy(e, dmg); break; }
-    }
-    this.devTaps = (this.devTaps || 0) + 1;
-    const compileThreshold = Math.max(8, 20 - (this.stats.devCompileBonus || 0));
-    if (this.devTaps >= compileThreshold) {
-      this.devTaps = 0;
-      // Compile: 16 bullets outward
-      const p = this.player;
-      for (let i = 0; i < 16; i++) {
-        const a = (i / 16) * TAU;
-        this.bullets.push({ x: p.x, y: p.y, vx: Math.cos(a) * 400, vy: Math.sin(a) * 400, dmg: 20, tex: 'spark', life: 1.0, pierce: 3, burn: this.stats.burnAll });
+      if (Math.hypot(e.x - wx, e.y - wy) < e.r + 32) {
+        this._hurtEnemy(e, dmg);
+        hitEnemy = true;
+        break;
       }
-      this._showBanner('COMPILE!', 'Developer skill', 'rage');
-      SFX.boom();
+    }
+
+    // GDD: only increment COMPILE counter if tap hit an enemy
+    if (hitEnemy) {
+      this.devTaps = (this.devTaps || 0) + 1;
+      bus.emit('COMPILE_TICK', { count: this.devTaps, max: Math.max(8, 20 - (this.stats.devCompileBonus || 0)) });
+
+      const compileThreshold = Math.max(8, 20 - (this.stats.devCompileBonus || 0));
+
+      if (this.devTaps >= compileThreshold) {
+        // GDD: Build failed — 10% chance at 90%+ stress
+        if (p.stress >= 90 && this.rng.next() < 0.10) {
+          this.devTaps = Math.floor(compileThreshold / 2);
+          this._showBanner('Build failed ❌', 'Stress quá cao! Mất nửa thanh', 'wave');
+          bus.emit('COMPILE_TICK', { count: this.devTaps, max: compileThreshold });
+          SFX.hurt();
+          return;
+        }
+
+        // COMPILE succeeds — fire 16 bullets outward
+        this.devTaps = 0;
+        for (let i = 0; i < 16; i++) {
+          const a = (i / 16) * TAU;
+          this.bullets.push({
+            x: p.x, y: p.y,
+            vx: Math.cos(a) * 420, vy: Math.sin(a) * 420,
+            dmg: 20, tex: 'spark', life: 1.1, pierce: 3,
+            burn: this.stats.burnAll,
+          });
+        }
+        // Extra burst particles
+        for (let i = 0; i < 12; i++) {
+          const a = this.rng.next() * TAU;
+          this.particles.push({ type: 'burst', x: p.x, y: p.y, vx: Math.cos(a)*180, vy: Math.sin(a)*180, life: 0.3, max: 0.3, color: 0xFFD447, size: 4 });
+        }
+        this.particles.push({ type: 'ring', x: p.x, y: p.y, r: 0, maxR: 160, life: 0.4, max: 0.4, color: 0xFFD447 });
+        this.particles.push({ type: 'ring', x: p.x, y: p.y, r: 0, maxR: 80,  life: 0.25, max: 0.25, color: 0xFFFFFF });
+        this._showBanner('COMPILED ✓', 'Code chạy ngon!', 'rage');
+        this.cameras.main.shake(180, 0.008);
+        SFX.boom();
+        bus.emit('COMPILE_TICK', { count: 0, max: compileThreshold });
+      }
     }
   }
 
@@ -1362,8 +1454,16 @@ export class BattleScene extends Phaser.Scene {
   // ── Rage / Dash ───────────────────────────────────────────────────────
   _tryRage() {
     const p = this.player;
-    if (p.stress < 100) return;
-    // Shockwave
+    // GDD: manual RAGE requires ≥80% stress. If auto-triggered already, skip.
+    if (p.stress < 80 || p.rage > 0) return;
+    const autoRage = p.stress >= 100; // at 100% → full auto-RAGE with exhaustion
+    this._doRage(autoRage);
+  }
+
+  _doRage(auto = false) {
+    const p = this.player;
+    if (p.rage > 0) return; // already raging
+    // Shockwave burst
     const radius = 280;
     for (const e of this.enemies) {
       if (e.dead) continue;
@@ -1372,15 +1472,28 @@ export class BattleScene extends Phaser.Scene {
         this._hurtEnemy(e, 40, { kx: Math.cos(ang) * 200, ky: Math.sin(ang) * 200 });
       }
     }
-    // Clear nearby bullets
+    // Clear nearby enemy bullets
     for (const b of this.ebullets) { if (Math.hypot(b.x - p.x, b.y - p.y) < radius + 40) b.dead = true; }
     this.particles.push({ type: 'ring', x: p.x, y: p.y, r: 0, maxR: radius, life: 0.5, max: 0.5, color: 0xFF4D6D });
+    this.particles.push({ type: 'ring', x: p.x, y: p.y, r: 0, maxR: radius * 0.6, life: 0.35, max: 0.35, color: 0xFFFFFF });
 
-    p.stress = 0; p.rage = 7;
+    p.stress = 0;
+    if (auto) {
+      // Full auto-RAGE: 6s invincible, then exhausted (GDD)
+      p.rage = 6;
+      p.invincible = 6;
+      p.exhaustAfterRage = true;
+      this._showBanner('🔥 RAGE!', '6 giây · Sát thương x2.5', 'rage');
+    } else {
+      // Early manual RAGE: 4s, no exhaustion (GDD: safe release valve)
+      p.rage = 4;
+      p.invincible = 4;
+      p.exhaustAfterRage = false;
+      this._showBanner('⚡ RAGE SỚM', '4 giây · Không kiệt sức', 'rage');
+    }
     this.rageTaps = 0;
     this.rageReadyShown = false;
-    this._showBanner('RAGE!', '7 giây', 'rage');
-    this.cameras.main.shake(300, 0.012);
+    this.cameras.main.shake(300, 0.014);
     SFX.rage();
   }
 
