@@ -8,7 +8,7 @@ import { createRNG } from '../rng.js';
 import { registerTextures, ENEMY_ART, drawPupils } from '../art/SpriteFactory.js';
 import { SFX, initAudio } from '../audio/SFX.js';
 import {
-  ENEMIES, WAVES, CARD, CARDS, SYNERGIES, SYN, CLASSES,
+  ENEMIES, WAVES, CARD, CARDS, SYNERGIES, SYN, CLASSES, EVOLUTIONS,
   nextXp, RARITY_WEIGHT, PUNS, scaledHp
 } from '../data/gameData.js';
 import { C } from '../art/colors.js';
@@ -295,6 +295,7 @@ export class BattleScene extends Phaser.Scene {
       // class-specific
       stamps: new Map(), // manager: enemy id → stamp count
       devTaps: 0,        // developer compile counter
+      standingFor: 0,         // for Deep Work evolution
       manageTapCd: 0,
     };
     this.cards = { [C.start]: 1 };
@@ -479,11 +480,27 @@ export class BattleScene extends Phaser.Scene {
     this.rageReadyShown = false;
     this.mash = null;
 
+    // Random events: pick 3 from 5 and schedule between wave milestones
+    this._setupEvents();
+    this.activeEvent = null;   // { type, timer, data }
+    this.wifiDown = 0;         // wifi-drop event timer
+    this.powerOutTimer = 0;    // power-cut event timer
+
     // Trial mode: 30 seconds then end
     if (this.trial) this.trialTimeLeft = 30;
 
     bus.emit('BATTLE_STARTED', { cls: this.cls, trial: this.trial });
     this._showBanner('Ca làm bắt đầu!', '08:00 · Hộp thư đầy', 'wave');
+  }
+
+  _setupEvents() {
+    const ALL_EVENTS = ['boss_walk', 'wifi_drop', 'birthday', 'reply_all', 'power_cut'];
+    // Shuffle and pick 3
+    const shuffled = [...ALL_EVENTS].sort(() => this.rng.next() - 0.5);
+    const chosen = shuffled.slice(0, 3);
+    // Schedule between wave milestones: ~t=75, 225, 450
+    const slots = [75, 225, 450];
+    this.scheduledEvents = chosen.map((type, i) => ({ t: slots[i], type }));
   }
 
   _setupCamera() {
@@ -536,6 +553,8 @@ export class BattleScene extends Phaser.Scene {
     this._updateParticles(dt);
     this._updateDamageTexts(dt);
     this._updateCombo(dt);
+    this._checkEvents(dt);
+    this._updateEvent(dt);
     this._updateStress(dt);
     this._updateWaves(dt);
     this._checkBoss(dt);
@@ -575,6 +594,8 @@ export class BattleScene extends Phaser.Scene {
     } else {
       p.moving = false;
     }
+    // Track standing time for Deep Work evolution
+    p.standingFor = p.moving ? 0 : (p.standingFor || 0) + dt;
 
     // Dash
     if (p.dashCd > 0) p.dashCd -= dt;
@@ -619,6 +640,8 @@ export class BattleScene extends Phaser.Scene {
     // Attack speed: Adrenaline zone adds +10% at 75%+ stress; RAGE doubles fire rate per GDD
     const adrAtkSpd = (p.stress >= 75 && p.stress < 100 && p.rage <= 0) ? 1.10 : 1.0;
     const spdMul = st.atkSpd * adrAtkSpd * (p.rage > 0 ? 2.0 : 1);
+    // Rớt wifi event: no auto-weapons
+    if (this.wifiDown > 0) return;
 
     for (const id of Object.keys(this.cards)) {
       const c = CARD[id];
@@ -648,6 +671,10 @@ export class BattleScene extends Phaser.Scene {
         case 'hotfix':  this._fireHotfix(lv, extraProj); break;
         case 'terminal': this._fireTerminal(lv, extraProj); break;
         case 'deploy':   this._fireDeploy(lv, extraProj); break;
+        case 'code_2am':      this._fireCode2am(lv, extraProj); break;
+        case 'deep_work':     this._fireDeepWork(lv); break;
+        case 'deploy_friday': this._fireDeployFriday(lv, extraProj); break;
+        case 'force_push':    this._fireForcePush(lv, extraProj); break;
       }
     }
   }
@@ -790,13 +817,115 @@ export class BattleScene extends Phaser.Scene {
     SFX.boom();
   }
 
+  // ── Evolved weapons ──────────────────────────────────────────────────
+  _fireCode2am(lv, extra) {
+    // 3 rapid beams toward nearest — evolved Syntax Shot
+    const target = this._nearest(this.player.x, this.player.y);
+    if (!target) return;
+    const p = this.player;
+    const base = Math.atan2(target.y - p.y, target.x - p.x);
+    for (let i = 0; i < 3; i++) {
+      const a = base + (i - 1) * 0.16;
+      this.bullets.push({ x: p.x, y: p.y, vx: Math.cos(a)*560, vy: Math.sin(a)*560, dmg: 30, tex: 'spark', life: 1.1, pierce: 2, burn: this.stats.burnAll });
+    }
+    // Stress tick: ~1/3s at 0.22 CD
+    this._code2amTicks = (this._code2amTicks || 0) + 1;
+    if (this._code2amTicks % 14 === 0) {
+      this.player.stress = Math.min(100, this.player.stress + 1);
+    }
+    SFX.shoot();
+  }
+
+  _fireDeepWork(lv) {
+    // Only fires when player has been standing still ≥0.8s
+    const p = this.player;
+    if ((p.standingFor || 0) < 0.8) return;
+    const radius = 200;
+    for (const e of this.enemies) {
+      if (e.dead) continue;
+      if (Math.hypot(e.x - p.x, e.y - p.y) < radius + e.r) {
+        this._hurtEnemy(e, 60); // GDD: no knockback
+      }
+    }
+    // Delete nearby enemy bullets
+    for (const b of this.ebullets) {
+      if (!b.dead && Math.hypot(b.x - p.x, b.y - p.y) < radius + 20) b.dead = true;
+    }
+    this.particles.push({ type: 'ring', x: p.x, y: p.y, r: 0, maxR: radius, life: 0.3, max: 0.3, color: 0x7B5CFF });
+    this.particles.push({ type: 'ring', x: p.x, y: p.y, r: 0, maxR: radius*0.55, life: 0.22, max: 0.22, color: 0xFFFFFF });
+    this.particles.push({ type: 'burst', x: p.x, y: p.y, vx: 0, vy: 0, life: 0.14, max: 0.14, color: 0x7B5CFF, size: 80 });
+    this.cameras.main.shake(120, 0.005);
+    SFX.boom();
+  }
+
+  _fireDeployFriday(lv, extra) {
+    // Big AoE explosion — evolved Hotfix
+    const p = this.player;
+    const radius = 250;
+    const dmg = 120;
+    for (const e of this.enemies) {
+      if (e.dead) continue;
+      if (Math.hypot(e.x - p.x, e.y - p.y) < radius + e.r) {
+        const ang = Math.atan2(e.y - p.y, e.x - p.x);
+        this._hurtEnemy(e, dmg, { burn: 20, kx: Math.cos(ang)*180, ky: Math.sin(ang)*180 });
+      }
+    }
+    // 15% chance of self-damage (GDD)
+    if (this.rng.next() < 0.15) {
+      this._hurtPlayer(10);
+      this.damageTexts.push({ x: p.x, y: p.y - 24, txt: '自爆 -10', color: '#FF4D6D', life: 0.9, alpha: 1, pun: true });
+    }
+    // Burn zone
+    this.zones.push({ x: p.x, y: p.y, r: radius * 0.55, life: 3.5, max: 3.5, dmgPerSec: 18 * (this.stats.burnMul || 1), tickTimer: 0 });
+    // Particles
+    this.particles.push({ type: 'ring',  x: p.x, y: p.y, r: 0, maxR: radius,     life: 0.45, max: 0.45, color: 0xFF4D6D });
+    this.particles.push({ type: 'ring',  x: p.x, y: p.y, r: 0, maxR: radius*0.6, life: 0.30, max: 0.30, color: 0xFFD447 });
+    this.particles.push({ type: 'burst', x: p.x, y: p.y, vx: 0, vy: 0,           life: 0.18, max: 0.18, color: 0xFF4D6D, size: radius * 0.45 });
+    for (let i = 0; i < 10; i++) {
+      const a = this.rng.next() * Math.PI * 2;
+      this.particles.push({ type: 'burst', x: p.x, y: p.y, vx: Math.cos(a)*220, vy: Math.sin(a)*220, life: 0.4, max: 0.4, color: 0xFF8A3D, size: 5 });
+    }
+    this.cameras.main.shake(320, 0.016);
+    SFX.boom();
+  }
+
+  _fireForcePush(lv, extra) {
+    // Super-wide pierce beam in facing direction — evolved Git Push
+    const p = this.player;
+    const angle = Math.atan2(p.fy, p.fx) || 0;
+    const count = 4 + (extra || 0);
+    const dmg = 55;
+    for (let i = 0; i < count; i++) {
+      const spread = (i - (count - 1) / 2) * 0.2;
+      const a = angle + spread;
+      this.bullets.push({
+        x: p.x, y: p.y,
+        vx: Math.cos(a) * 400, vy: Math.sin(a) * 400,
+        dmg, tex: 'plane', life: 2.4, pierce: 999,
+        burn: this.stats.burnAll, rot: a,
+      });
+    }
+    // Destroy enemy bullets in cone ahead
+    const cos = Math.cos(angle), sin = Math.sin(angle);
+    for (const b of this.ebullets) {
+      if (b.dead) continue;
+      const dx = b.x - p.x, dy = b.y - p.y;
+      const along = dx * cos + dy * sin;
+      const perp = Math.abs(-dx * sin + dy * cos);
+      if (along > 0 && along < 700 && perp < 100) b.dead = true;
+    }
+    SFX.shoot();
+  }
+
   // ── Orbit (mouse weapon) ──────────────────────────────────────────────
   _updateOrbit(dt) {
-    const lv = this.cards['mouse'];
-    if (!lv) return;
+    const lv = this.cards['mouse'] || 0;
+    const isRubberDebug = !!this.cards['rubber_debug'];
+    if (!lv && !isRubberDebug) return;
     const p = this.player;
-    const count = (lv >= 5 ? 4 : lv >= 3 ? 3 : 2) + (this.stats.devMouseExtra || 0);
-    const dmg = Math.round(11 * (1 + 0.25 * (lv - 1)));
+    const count = isRubberDebug ? 6 : (lv >= 5 ? 4 : lv >= 3 ? 3 : 2) + (this.stats.devMouseExtra || 0);
+    const dmg = isRubberDebug ? 22 : Math.round(10 * (1 + 0.25 * (lv - 1)));
+    const debugBugMul = isRubberDebug ? 3 : 1; // x3 on Bug for rubber_debug
     const orbitR = 60 + count * 5;
     this.orbitAngle += dt * (2 + 0.3 * lv) * (p.rage > 0 ? 1.6 : 1);
 
@@ -815,7 +944,8 @@ export class BattleScene extends Phaser.Scene {
       for (const e of this.enemies) {
         if (e.dead) continue;
         if (Math.hypot(e.x - ob.x, e.y - ob.y) < e.r + 8) {
-          this._hurtEnemy(e, dmg, { burn: this.stats.burnAll });
+          const orbitDmg = (isRubberDebug && e.T.bug) ? dmg * debugBugMul * (this.stats.bugMul || 1) : dmg;
+          this._hurtEnemy(e, orbitDmg, { burn: this.stats.burnAll });
           ob.hitTimer = 0.3;
           break;
         }
@@ -992,7 +1122,15 @@ export class BattleScene extends Phaser.Scene {
         const ang = Math.atan2(p.y - gem.y, p.x - gem.x);
         gem.x += Math.cos(ang) * 300 * dt; gem.y += Math.sin(ang) * 300 * dt;
         if (Math.hypot(gem.x - p.x, gem.y - p.y) < p.r + 8) {
-          gem.collected = true; this._giveXp(gem.xp);
+          gem.collected = true;
+          if (gem.isCake) {
+            // Birthday cake: heal 30 HP
+            this.player.hp = Math.min(this.player.maxHp, this.player.hp + 30);
+            this._showBanner('🎂 Ngon!', '+30 HP — Chúc mừng sinh nhật!', 'syn');
+            SFX.level();
+          } else {
+            this._giveXp(gem.xp);
+          }
         }
       }
     }
@@ -1026,6 +1164,95 @@ export class BattleScene extends Phaser.Scene {
     if (this.combo > 0) {
       this.comboTimer -= dt;
       if (this.comboTimer <= 0) this.combo = 0;
+    }
+  }
+
+  _checkEvents(dt) {
+    if (!this.scheduledEvents?.length) return;
+    if (this.bossSpawned) return;
+    const next = this.scheduledEvents[0];
+    if (this.elapsed >= next.t) {
+      this.scheduledEvents.shift();
+      this._triggerEvent(next.type);
+    }
+  }
+
+  _triggerEvent(type) {
+    const p = this.player;
+    this.activeEvent = { type, timer: 0 };
+    switch (type) {
+      case 'boss_walk':
+        this.activeEvent.dur = 8;
+        this._showBanner('👔 Sếp đi ngang!', 'Đứng yên — mỗi giây di chuyển +5 Stress', 'wave');
+        break;
+      case 'wifi_drop':
+        this.activeEvent.dur = 6;
+        this.wifiDown = 6;
+        this._showBanner('📶 Rớt wifi!', 'Vũ khí tạm ngừng 6s — COMPILE FULL khi wifi có lại', 'wave');
+        break;
+      case 'birthday':
+        this.activeEvent.dur = 15;
+        // Spawn birthday cake at map edge near player
+        const cakeAng = this.rng.next() * Math.PI * 2;
+        const cakeDist = 280 + this.rng.next() * 120;
+        this.gems.push({
+          x: Phaser.Math.Clamp(p.x + Math.cos(cakeAng) * cakeDist, 60, 2340),
+          y: Phaser.Math.Clamp(p.y + Math.sin(cakeAng) * cakeDist, 60, 2340),
+          xp: 0, homing: false, collected: false,
+          isCake: true,
+          // Cake glows yellow-pink
+        });
+        this._showBanner('🎂 Sinh nhật đồng nghiệp!', 'Tìm bánh kem — ăn được hồi 30 HP', 'syn');
+        break;
+      case 'reply_all':
+        this.activeEvent.dur = 10;
+        this.activeEvent.gemMul = 2;
+        this._showBanner('📧 Reply All cả công ty!', 'Gem ×2 trong 10 giây', 'syn');
+        break;
+      case 'power_cut':
+        this.activeEvent.dur = 5;
+        this.powerOutTimer = 5;
+        this._showBanner('💡 Cúp điện!', 'Màn tối 5s — chỉ thấy vùng quanh người', 'rage');
+        this.cameras.main.shake(200, 0.008);
+        break;
+    }
+  }
+
+  _updateEvent(dt) {
+    if (!this.activeEvent) return;
+    this.activeEvent.timer += dt;
+    const { type, timer, dur } = this.activeEvent;
+
+    // Boss walk: +5 stress/s if player moves
+    if (type === 'boss_walk' && this.player.moving) {
+      this.player.stress = Math.min(100, this.player.stress + 5 * dt * this.stats.stressGain);
+    }
+
+    // Wifi drop countdown
+    if (type === 'wifi_drop' && this.wifiDown > 0) {
+      this.wifiDown -= dt;
+      if (this.wifiDown <= 0) {
+        this.wifiDown = 0;
+        // COMPILE FULL reward
+        if (this.cls === 'developer') {
+          const threshold = Math.max(8, 20 - (this.stats.devCompileBonus || 0));
+          this.devTaps = threshold;
+          this._showBanner('📶 Wifi có lại!', 'COMPILE sẵn sàng!', 'syn');
+        }
+      }
+    }
+
+    // Power out countdown
+    if (type === 'power_cut') this.powerOutTimer = Math.max(0, this.powerOutTimer - dt);
+
+    // Event ended
+    if (timer >= dur) {
+      if (type === 'boss_walk') {
+        this.player.stress = Math.max(0, this.player.stress - 15);
+        this._showBanner('👔 Sếp đi rồi!', 'Stress −15', 'wave');
+      }
+      if (type === 'reply_all') this._showBanner('📧 Inbox dọn xong!', 'Gem ×2 kết thúc', 'wave');
+      this.activeEvent = null;
     }
   }
 
@@ -1171,10 +1398,11 @@ export class BattleScene extends Phaser.Scene {
       this.hudTimer = 0.1; // 10/s max
       const p = this.player;
       const t = this.elapsed;
-      const gameMin = Math.floor(t / 60);
-      const gameSec = Math.floor(t % 60);
-      const gameHr = 8 + Math.floor(t / 60);
-      const clockStr = `${String(gameHr).padStart(2, '0')}:${String(gameSec).padStart(2, '0')}`;
+      // GDD: 1 real second = 8 game seconds (08:00→10:00 in 900 real seconds)
+      const gameTimeSec = Math.floor(t * 8);
+      const gameHr = 8 + Math.floor(gameTimeSec / 3600);
+      const gameMin = Math.floor((gameTimeSec % 3600) / 60);
+      const clockStr = `${String(gameHr).padStart(2, '0')}:${String(gameMin).padStart(2, '0')}`;
       // Stress zone labels (GDD)
       const sz = p.stress >= 100 ? 'rage' : p.stress >= 90 ? 'overload' : p.stress >= 50 ? 'adrenaline' : 'calm';
       const compileMax = Math.max(8, 20 - (this.stats.devCompileBonus || 0));
@@ -1266,7 +1494,8 @@ export class BattleScene extends Phaser.Scene {
     if (this.combo % 10 === 0) this.player.stress = Math.min(100, this.player.stress + 6 * this.stats.stressGain);
 
     // Drop gems
-    for (let i = 0; i < e.T.xp; i++) {
+    const xpMul = this.activeEvent?.gemMul || 1;
+    for (let i = 0; i < e.T.xp * xpMul; i++) {
       this.gems.push({ x: e.x + this.rng.range(-12, 12), y: e.y + this.rng.range(-12, 12), xp: 1, homing: false, collected: false });
     }
     // Drop health (from meeting/customer)
@@ -1528,7 +1757,8 @@ export class BattleScene extends Phaser.Scene {
     // Pick 3 cards weighted by rarity and biased by class
     const cls = CLASSES[this.cls];
     const bias = cls?.bias;
-    const pool = [...CARDS];
+    // Exclude evolved weapons from offer pool (they can't be picked directly)
+    const pool = CARDS.filter(c => c.rarity !== 'evolved');
     const pick = [];
     const tries = 40;
     for (let attempt = 0; attempt < tries && pick.length < 3; attempt++) {
@@ -1555,6 +1785,40 @@ export class BattleScene extends Phaser.Scene {
     return pick;
   }
 
+  // ── Evolution system ──────────────────────────────────────────────────
+  _checkEvolution() {
+    if (this.state !== 'battle' || this.cls !== 'developer') return;
+    for (const evo of EVOLUTIONS) {
+      if (this.cards[evo.result]) continue;          // already evolved
+      if ((this.cards[evo.weapon] || 0) < 5) continue; // weapon not maxed
+      if (!this.cards[evo.passive]) continue;        // passive not owned
+      this._doEvolution(evo);
+      return; // one evolution at a time
+    }
+  }
+
+  _doEvolution(evo) {
+    // Remove base weapon, add evolved weapon
+    delete this.cards[evo.weapon];
+    delete this.weaponTimers[evo.weapon];
+    this.cards[evo.result] = 5; // evolved weapons at max level
+    this.weaponTimers[evo.result] = 0;
+    this._recompute();
+    this._showBanner(`✨ TIẾN HÓA · ${evo.name}`, evo.desc, 'syn');
+    this.cameras.main.flash(700, 255, 215, 0, true);
+    this.cameras.main.shake(450, 0.012);
+    // Big burst of yellow particles
+    const p = this.player;
+    for (let i = 0; i < 20; i++) {
+      const a = this.rng.next() * Math.PI * 2;
+      const v = this.rng.range(100, 300);
+      this.particles.push({ type: 'burst', x: p.x, y: p.y, vx: Math.cos(a)*v, vy: Math.sin(a)*v, life: 0.6, max: 0.6, color: 0xFFD447, size: this.rng.range(4, 8) });
+    }
+    this.particles.push({ type: 'ring', x: p.x, y: p.y, r: 0, maxR: 220, life: 0.5, max: 0.5, color: 0xFFD447 });
+    SFX.level();
+    bus.emit('EVOLUTION', { weapon: evo.weapon, result: evo.result, name: evo.name });
+  }
+
   _pickCard(id) {
     const lv = (this.cards[id] || 0) + 1;
     this.cards[id] = Math.min(lv, 5);
@@ -1563,6 +1827,7 @@ export class BattleScene extends Phaser.Scene {
     this.offer = [];
     this.paused = false;
     SFX.pick();
+    this._checkEvolution();
   }
 
   // ── End battle ────────────────────────────────────────────────────────
@@ -1649,12 +1914,12 @@ export class BattleScene extends Phaser.Scene {
       const glow = 0.12 + Math.sin(t * 0.9 + phase) * 0.06;
       const screenColor = desk.seed > 0.6 ? 0x2EC4B6 : desk.seed > 0.3 ? 0x7B5CFF : 0x3A8AFF;
       g.fillStyle(screenColor, glow);
-      g.fillRoundedRect(monX - 13, monY - 8, 26, 16, 2);
+      g.fillRect(monX - 13, monY - 8, 26, 16);
 
       // Occasional "blink" — simulate screen content flash
       if (Math.sin(t * 3.1 + phase * 2) > 0.97) {
         g.fillStyle(0xFFFFFF, 0.08);
-        g.fillRoundedRect(monX - 13, monY - 8, 26, 4, 1);
+        g.fillRect(monX - 13, monY - 8, 26, 4);
       }
 
       // Coffee steam (only desks with coffee cups)
@@ -1853,6 +2118,22 @@ export class BattleScene extends Phaser.Scene {
         g.lineStyle(2.5, 0xFFD447, (Math.sin(Date.now() * 0.015) * 0.4 + 0.6));
         g.strokeCircle(p.x, p.y, 22);
       }
+    }
+
+    // Power outage overlay (square hole for visibility)
+    if (this.powerOutTimer > 0) {
+      const alpha = Math.min(0.95, this.powerOutTimer / 1.5);
+      const px = this.player.x, py = this.player.y;
+      const vr = 140; // visibility radius (square)
+      g.fillStyle(0x1D1B2E, alpha);
+      // Top
+      g.fillRect(cam.scrollX, cam.scrollY, cam.width, py - vr - cam.scrollY);
+      // Bottom
+      g.fillRect(cam.scrollX, py + vr, cam.width, cam.scrollY + cam.height - (py + vr));
+      // Left
+      g.fillRect(cam.scrollX, Math.max(cam.scrollY, py - vr), px - vr - cam.scrollX, Math.min(vr * 2, cam.scrollY + cam.height - Math.max(cam.scrollY, py - vr)));
+      // Right
+      g.fillRect(px + vr, Math.max(cam.scrollY, py - vr), cam.scrollX + cam.width - (px + vr), Math.min(vr * 2, cam.scrollY + cam.height - Math.max(cam.scrollY, py - vr)));
     }
   }
 

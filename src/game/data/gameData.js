@@ -11,17 +11,18 @@ export const ENEMIES = {
   boss:     { r: 46, hp: 6000, spd: 46,  dmg: 24, xp: 0, kb: 0.04, color: '#FF4D6D', bug: false, charge: false, boss: true  },
 };
 
-// HP scales over time: hp × (1 + seconds/95), capped at 170 enemies
+// GDD: HP +8% per 10 game minutes = per 75 real seconds
 export function scaledHp(base, elapsed) {
-  return Math.round(base * (1 + elapsed / 95));
+  return Math.round(base * Math.pow(1.08, Math.floor(elapsed / 75)));
 }
 
 // ── Waves (1 real second = 1 game minute) ────────────────────────────────
 export const WAVES = [
-  { t: 0,   name: 'Hộp thư đầy',        sub: '08:00 · Email và thông báo dồn dập', rate: 1.0, mix: { email: 6, notif: 3 } },
-  { t: 40,  name: 'Họp liên miên',       sub: '08:40 · Cuộc họp và bug xuất hiện',  rate: 1.5, mix: { email: 4, notif: 2, meeting: 2, bug: 3 } },
-  { t: 80,  name: 'Khách hàng nổi giận', sub: '09:20 · Coi chừng cú lao tới',       rate: 2.0, mix: { email: 3, meeting: 2, bug: 3, customer: 3 } },
-  { t: 120, name: 'Deadline',            sub: '10:00 · Boss xuất hiện',             rate: 1.1, mix: { email: 4, notif: 3, bug: 2 }, boss: true },
+  { t: 0,   name: 'Khởi động',         sub: '08:00 · Email thứ Hai sáng — gem dày để lên cấp nhanh', rate: 0.7,  mix: { email: 7, notif: 3 } },
+  { t: 150, name: 'Hộp thư đầy',       sub: '08:20 · Email theo đàn — Elite đầu tiên xuất hiện',      rate: 1.3,  mix: { email: 5, notif: 3, bug: 1 } },
+  { t: 300, name: 'Họp liên miên',      sub: '08:40 · Họp, bug và lời mời kéo nhau tới',               rate: 1.8,  mix: { email: 3, notif: 2, meeting: 3, bug: 3 } },
+  { t: 600, name: 'Khách nổi giận',    sub: '09:20 · Coi chừng cú lao thẳng!',                         rate: 2.6,  mix: { email: 2, meeting: 2, bug: 3, customer: 4 } },
+  { t: 900, name: 'Deadline',           sub: '10:00 · Boss Deadline xuất hiện!',                         rate: 1.2,  mix: { email: 3, notif: 3, bug: 2 }, boss: true },
 ];
 
 // ── Cards ─────────────────────────────────────────────────────────────────
@@ -143,8 +144,60 @@ export const CARDS = [
     stat: (s, l) => { s.atkSpd += 0.12 * l; s.dmgMul += 0.1 * l; s.maxHp -= 10 * l; },
     desc: l => `Tốc đánh +${12 * l}%, sát thương +${10 * l}%, máu tối đa −${10 * l}.`,
   },
+  {
+    id: 'unit_test', icon: '🧪', name: 'Unit Test',
+    type: 'passive', rarity: 'rare', tags: ['developer', 'defense'],
+    stat: (s, l) => { s.shieldInterval = Math.max(8, 20 - l * 2); },
+    desc: l => `Khiên chặn 1 đòn mỗi ${20 - l * 2}s. Dùng để tiến hóa Git Push → Force Push.`,
+  },
+  {
+    id: 'second_monitor', icon: '🖥️', name: 'Màn hình thứ hai',
+    type: 'passive', rarity: 'rare', tags: ['developer'],
+    stat: (s, l) => { s.pickup += 20 * l; s.aoeBonus = (s.aoeBonus || 0) + 0.1 * l; },
+    desc: l => `Hút gem xa hơn (+${20*l}px), AoE/Tầm +${10*l}%. Dùng tiến hóa Rubber Duck.`,
+  },
+  // ── Evolved weapons (result of evolution — NOT in offer pool) ────────
+  {
+    id: 'code_2am', icon: '🌙', name: 'Code lúc 2h Sáng',
+    type: 'weapon', rarity: 'evolved', tags: ['developer', 'speed'],
+    cd: () => 0.22,
+    desc: () => '3 tia code liên tục, 30 sát thương mỗi tia; Stress +1 mỗi 3 giây.',
+  },
+  {
+    id: 'deep_work', icon: '🧘', name: 'Deep Work',
+    type: 'weapon', rarity: 'evolved', tags: ['developer', 'aoe'],
+    cd: () => 0.5,
+    desc: () => 'Đứng yên → sóng 360°, 60 sát thương mỗi 0.5s, miễn đẩy lùi.',
+  },
+  {
+    id: 'deploy_friday', icon: '🔥', name: 'Deploy Ngày Thứ Sáu',
+    type: 'weapon', rarity: 'evolved', tags: ['developer', 'aoe', 'fire'],
+    cd: () => 2.5,
+    desc: () => 'Nổ AoE 250px, 120 sát thương. 15% tự gây 10 sát thương.',
+  },
+  {
+    id: 'force_push', icon: '⚡', name: 'Force Push',
+    type: 'weapon', rarity: 'evolved', tags: ['developer', 'pierce'],
+    cd: () => 1.0,
+    desc: () => 'Luồng code siêu rộng xuyên vô hạn, hủy đạn địch trên đường đi.',
+  },
+  {
+    id: 'rubber_debug', icon: '🦆', name: 'Rubber Duck Debugging',
+    type: 'weapon', rarity: 'evolved', tags: ['developer', 'orbit'],
+    cd: null,
+    desc: () => '6 vịt bay quanh người; Trúng BUG: x3 sát thương (cộng dồn Debug Mode).',
+  },
 ];
 export const CARD = Object.fromEntries(CARDS.map(c => [c.id, c]));
+
+// ── Weapon evolutions (weapon lv5 + passive → evolved weapon) ────────────
+export const EVOLUTIONS = [
+  { weapon: 'stapler',  passive: 'espresso',       result: 'code_2am',      name: 'Code lúc 2h Sáng',        desc: '3 tia liên tục · Stress +1/3s' },
+  { weapon: 'keyboard', passive: 'headphones',      result: 'deep_work',     name: 'Deep Work',                desc: 'Đứng yên → sóng 360° liên tục' },
+  { weapon: 'hotfix',   passive: 'shoes',           result: 'deploy_friday', name: 'Deploy Ngày Thứ Sáu',      desc: 'AoE 250px · 15% tự gây dmg' },
+  { weapon: 'plane',    passive: 'unit_test',       result: 'force_push',    name: 'Force Push',               desc: 'Luồng siêu rộng · hủy đạn địch' },
+  { weapon: 'mouse',    passive: 'second_monitor',  result: 'rubber_debug',  name: 'Rubber Duck Debugging',    desc: '6 vịt · x3 sát thương lên BUG' },
+];
 
 // ── Synergies ─────────────────────────────────────────────────────────────
 export const SYNERGIES = [
