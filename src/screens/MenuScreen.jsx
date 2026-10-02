@@ -3,6 +3,7 @@ import { CLASSES } from '../game/data/gameData.js';
 import { portraitDataURL, enemyPortraitDataURL } from '../game/art/SpriteFactory.js';
 import { updateDisplayName } from '../supabase.js';
 import { TiltPortrait } from '../components/TiltPortrait.jsx';
+import { AnimatedPortrait } from '../components/AnimatedPortrait.jsx';
 import { getUpgradeTier } from './UpgradeScreen.jsx';
 import { getDailyState, formatCountdown, getMsUntilMidnightICT, getDailyKey } from '../utils/dailySeed.js';
 
@@ -274,7 +275,7 @@ export function MenuScreen({ onStart, onDailyStart, onTrial, onBook, onLeaderboa
                 <div class="cd-head">
                   {portraits[sel] && (
                     sel === 'developer'
-                      ? <TiltPortrait src={portraitDataURL(sel, 42, getUpgradeTier())} size={72} maxDeg={16} />
+                      ? <AnimatedPortrait tier={getUpgradeTier()} size={96} />
                       : <img src={portraits[sel]} alt={cls.name} />
                   )}
                   <div>

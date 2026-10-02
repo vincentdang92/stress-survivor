@@ -3,6 +3,7 @@ import { useState, useEffect } from 'preact/hooks';
 import { CLASSES, ENEMIES, CARDS } from '../game/data/gameData.js';
 import { portraitDataURL, enemyPortraitDataURL } from '../game/art/SpriteFactory.js';
 import { TiltPortrait } from '../components/TiltPortrait.jsx';
+import { AnimatedPortrait } from '../components/AnimatedPortrait.jsx';
 import { getUpgradeTier } from './UpgradeScreen.jsx';
 
 function loadOwned() {
@@ -60,8 +61,8 @@ function CharacterDetail({ cls, clsKey, portrait }) {
   return (
     <div class="book-detail">
       <div class="book-detail-head">
-        {clsKey === 'developer' && portrait
-          ? <TiltPortrait src={portraitDataURL('developer', 48, tier)} size={80} maxDeg={18} />
+        {clsKey === 'developer'
+          ? <AnimatedPortrait tier={tier} size={92} />
           : portrait
             ? <img src={portrait} alt={cls.name} class="book-detail-portrait" />
             : <span style={{ fontSize: 56 }}>👤</span>}
