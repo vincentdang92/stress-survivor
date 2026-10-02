@@ -417,30 +417,62 @@ export function registerTextures(scene) {
 
   // Projectiles
   if (!scene.textures.exists('staple')) {
-    const sc = document.createElement('canvas'); sc.width = 14; sc.height = 6;
+    const sc = document.createElement('canvas'); sc.width = 16; sc.height = 8;
     const sg = sc.getContext('2d');
-    sg.fillStyle = '#8C95AB'; sg.fillRect(1, 1, 12, 4); sg.strokeStyle = C.INK; sg.lineWidth = 1.5; sg.strokeRect(1, 1, 12, 4);
+    // Shadow
+    sg.fillStyle = '#1D1B2E'; sg.globalAlpha = 0.3;
+    sg.fillRoundedRect(3, 2, 12, 5, 2); sg.globalAlpha = 1;
+    // Body (warm metallic)
+    sg.fillStyle = '#D0C8B0'; sg.strokeStyle = C.INK; sg.lineWidth = 1.5;
+    sg.beginPath(); sg.roundRect(1, 1, 13, 5, 2); sg.fill(); sg.stroke();
+    // Shine highlight line
+    sg.strokeStyle = '#FFF8E0'; sg.lineWidth = 0.8; sg.globalAlpha = 0.8;
+    sg.beginPath(); sg.moveTo(2, 2.5); sg.lineTo(13, 2.5); sg.stroke();
+    sg.globalAlpha = 1;
     scene.textures.addCanvas('staple', sc);
   }
   if (!scene.textures.exists('plane')) {
-    const pc = document.createElement('canvas'); pc.width = 24; pc.height = 16;
+    const pc = document.createElement('canvas'); pc.width = 28; pc.height = 18;
     const pg = pc.getContext('2d');
-    pg.translate(12, 8);
-    pg.beginPath(); pg.moveTo(-10, 2); pg.lineTo(10, 0); pg.lineTo(-10, -2); pg.closePath();
-    pg.fillStyle = '#FFFFFF'; pg.fill(); pg.strokeStyle = C.INK; pg.lineWidth = 1.5; pg.stroke();
+    pg.translate(14, 9);
+    // Glow halo
+    pg.globalAlpha = 0.25; pg.fillStyle = '#2EC4B6';
+    pg.beginPath(); pg.ellipse(0, 0, 12, 8, 0, 0, TAU); pg.fill(); pg.globalAlpha = 1;
+    // Body — teal plane
+    pg.beginPath(); pg.moveTo(-11, 2.5); pg.lineTo(11, 0); pg.lineTo(-11, -2.5); pg.closePath();
+    pg.fillStyle = '#2EC4B6'; pg.fill(); pg.strokeStyle = C.INK; pg.lineWidth = 1.5; pg.stroke();
+    // Engine glow at tail
+    pg.globalAlpha = 0.7; pg.fillStyle = '#FFFFFF';
+    pg.beginPath(); pg.ellipse(-10, 0, 3, 1.8, 0, 0, TAU); pg.fill(); pg.globalAlpha = 1;
     scene.textures.addCanvas('plane', pc);
   }
   if (!scene.textures.exists('spark')) {
-    const kc = document.createElement('canvas'); kc.width = 8; kc.height = 8;
-    const kg = kc.getContext('2d'); kg.translate(4, 4);
-    kg.fillStyle = '#2EC4B6'; circ(kg, 0, 0, 3.5); kg.fill(); kg.strokeStyle = C.INK; kg.lineWidth = 1.2; kg.stroke();
+    const kc = document.createElement('canvas'); kc.width = 12; kc.height = 12;
+    const kg = kc.getContext('2d'); kg.translate(6, 6);
+    // Outer glow
+    kg.globalAlpha = 0.3; kg.fillStyle = '#2EC4B6';
+    circ(kg, 0, 0, 5.5); kg.fill(); kg.globalAlpha = 1;
+    // Main body
+    circ(kg, 0, 0, 4); kg.fillStyle = '#80FFFF'; kg.fill();
+    kg.strokeStyle = C.INK; kg.lineWidth = 1.4; kg.stroke();
+    // White core
+    circ(kg, 0, 0, 1.8); kg.fillStyle = '#FFFFFF'; kg.fill();
     scene.textures.addCanvas('spark', kc);
   }
 
-  // Particle (circle)
+  // Particle (circle) — orange for coffee/deploy
   if (!scene.textures.exists('dot')) {
-    const dc = document.createElement('canvas'); dc.width = dc.height = 8;
-    const dg = dc.getContext('2d'); dg.fillStyle = '#FFFFFF'; dg.beginPath(); dg.arc(4, 4, 3.5, 0, TAU); dg.fill();
+    const dc = document.createElement('canvas'); dc.width = dc.height = 12;
+    const dg = dc.getContext('2d');
+    // Outer glow
+    dg.globalAlpha = 0.3; dg.fillStyle = '#FF8A3D';
+    dg.beginPath(); dg.arc(6, 6, 5.5, 0, TAU); dg.fill(); dg.globalAlpha = 1;
+    // Core ball
+    dg.fillStyle = '#FF8A3D'; dg.beginPath(); dg.arc(6, 6, 4, 0, TAU); dg.fill();
+    dg.strokeStyle = '#CC4400'; dg.lineWidth = 1.2; dg.stroke();
+    // Shine
+    dg.globalAlpha = 0.6; dg.fillStyle = '#FFCC99';
+    dg.beginPath(); dg.arc(4.5, 4.5, 1.5, 0, TAU); dg.fill(); dg.globalAlpha = 1;
     scene.textures.addCanvas('dot', dc);
   }
 }

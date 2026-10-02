@@ -512,7 +512,14 @@ export class BattleScene extends Phaser.Scene {
           const ang = (i / t.count) * Math.PI * 2;
           this.bullets.push({ x: t.x, y: t.y, vx: Math.cos(ang)*380, vy: Math.sin(ang)*380, dmg, tex: 'staple', life: 1.0, pierce: 2, burn: this.stats.burnAll });
         }
-        this.particles.push({ type: 'ring', x: t.x, y: t.y, r: 0, maxR: 100, life: 0.3, max: 0.3, color: 0x2EC4B6 });
+        // Visual: expand ring + bright teal flash + mini sparks
+        this.particles.push({ type: 'ring',  x: t.x, y: t.y, r: 0, maxR: 110, life: 0.32, max: 0.32, color: 0x2EC4B6 });
+        this.particles.push({ type: 'ring',  x: t.x, y: t.y, r: 0, maxR: 60,  life: 0.22, max: 0.22, color: 0xFFFFFF });
+        this.particles.push({ type: 'burst', x: t.x, y: t.y, vx: 0, vy: 0,    life: 0.12, max: 0.12, color: 0x2EC4B6, size: 28 });
+        for (let i = 0; i < 8; i++) {
+          const sa = (i / 8) * TAU;
+          this.particles.push({ type: 'burst', x: t.x, y: t.y, vx: Math.cos(sa)*180, vy: Math.sin(sa)*180, life: 0.28, max: 0.28, color: 0x2EC4B6, size: 4 });
+        }
         SFX.boom();
         return false;
       });
@@ -690,8 +697,12 @@ export class BattleScene extends Phaser.Scene {
     for (const b of this.ebullets) {
       if (!b.dead && Math.hypot(b.x - p.x, b.y - p.y) < radius + 40) b.dead = true;
     }
-    // Visual wave ring
-    this.particles.push({ type: 'ring', x: p.x, y: p.y, r: 0, maxR: radius, life: 0.4, max: 0.4, color: 0xFFD447 });
+    // 3-ring visual shockwave + center flash
+    this.particles.push({ type: 'ring', x: p.x, y: p.y, r: 0, maxR: radius,       life: 0.42, max: 0.42, color: 0xFFD447 });
+    this.particles.push({ type: 'ring', x: p.x, y: p.y, r: 0, maxR: radius * 0.6, life: 0.30, max: 0.30, color: 0xFFFFFF });
+    this.particles.push({ type: 'ring', x: p.x, y: p.y, r: 0, maxR: radius * 1.3, life: 0.55, max: 0.55, color: 0xFF8A3D });
+    // Center flash burst
+    this.particles.push({ type: 'burst', x: p.x, y: p.y, vx: 0, vy: 0, life: 0.14, max: 0.14, color: 0xFFD447, size: radius * 0.5 });
     this.cameras.main.shake(200, 0.008);
     SFX.boom();
   }
@@ -776,7 +787,7 @@ export class BattleScene extends Phaser.Scene {
     for (let i = 0; i < count; i++) {
       const a = this.orbitAngle + (i / count) * TAU;
       const ob = this.orbitBullets[i];
-      ob.px = ob.x; ob.py = ob.y;
+      ob.px = ob.x; ob.py = ob.y; // prev pos for trail
       ob.x = p.x + Math.cos(a) * orbitR;
       ob.y = p.y + Math.sin(a) * orbitR;
       if (ob.hitTimer > 0) { ob.hitTimer -= dt; continue; }
@@ -796,6 +807,7 @@ export class BattleScene extends Phaser.Scene {
   _updateBullets(dt) {
     for (const b of this.bullets) {
       if (b.dead) continue;
+      b.px = b.x; b.py = b.y; // store prev pos for trail rendering
       if (b.zap) { b.life -= dt; if (b.life <= 0) b.dead = true; continue; }
       if (b.isCoffee) {
         b.x += b.vx * dt; b.y += b.vy * dt;
@@ -1161,6 +1173,15 @@ export class BattleScene extends Phaser.Scene {
     // Damage text
     const col = crit ? '#FFD447' : e.T.bug ? '#7BD66B' : '#FFFFFF';
     this.damageTexts.push({ x: e.x + (this.rng.next() - 0.5) * 12, y: e.y - e.r - 10, txt: d, color: col, life: 0.7, alpha: 1 });
+
+    // Impact spark burst
+    const sparkCol = crit ? 0xFFD447 : e.T.bug ? 0x7BD66B : 0xFFFFFF;
+    const sparkCount = crit ? 6 : 3;
+    for (let i = 0; i < sparkCount; i++) {
+      const ia = this.rng.next() * TAU;
+      const iv = this.rng.range(80, 220);
+      this.particles.push({ type: 'burst', x: e.x, y: e.y, vx: Math.cos(ia)*iv, vy: Math.sin(ia)*iv, life: 0.22, max: 0.22, color: sparkCol, size: crit ? this.rng.range(3,5) : this.rng.range(2,3) });
+    }
 
     SFX.hit();
     if (e.hp <= 0) this._killEnemy(e);
@@ -1550,10 +1571,22 @@ export class BattleScene extends Phaser.Scene {
       if (pt.type === 'burst') {
         g.fillStyle(pt.color, a); g.fillCircle(pt.x, pt.y, pt.size || 4);
       } else if (pt.type === 'ring') {
-        g.lineStyle(4, pt.color, a); g.strokeCircle(pt.x, pt.y, pt.r);
+        // Ring width pulses wider at start then thins
+        const rw = 2 + (1 - a) * 6;
+        g.lineStyle(rw, pt.color, a * 0.9); g.strokeCircle(pt.x, pt.y, pt.r);
+        // Inner glow fill
+        g.fillStyle(pt.color, a * 0.08); g.fillCircle(pt.x, pt.y, pt.r);
       } else if (pt.type === 'zap') {
-        g.lineStyle(2, 0x2EC4B6, a);
+        // 3-layer lightning: outer glow + cyan + white core
+        g.lineStyle(7, pt.color || 0x2EC4B6, a * 0.18);
         g.beginPath(); g.moveTo(pt.x1, pt.y1); g.lineTo(pt.x2, pt.y2); g.strokePath();
+        g.lineStyle(2.5, pt.color || 0x2EC4B6, a * 0.95);
+        g.beginPath(); g.moveTo(pt.x1, pt.y1); g.lineTo(pt.x2, pt.y2); g.strokePath();
+        g.lineStyle(1, 0xFFFFFF, a * 0.75);
+        g.beginPath(); g.moveTo(pt.x1, pt.y1); g.lineTo(pt.x2, pt.y2); g.strokePath();
+        // Endpoint flares
+        g.fillStyle(0xFFFFFF, a * 0.9); g.fillCircle(pt.x2, pt.y2, 4 * a);
+        g.fillStyle(pt.color || 0x2EC4B6, a * 0.5); g.fillCircle(pt.x2, pt.y2, 9 * a);
       }
     }
 
@@ -1577,7 +1610,31 @@ export class BattleScene extends Phaser.Scene {
     }
     for (let i = gemIdx; i < this._gemPool.length; i++) this._gemPool[i].setVisible(false);
 
-    // ── Player bullets ────────────────────────────────────────────
+    // ── Player bullet glow + trails (drawn BEFORE sprites) ────────
+    for (const b of this.bullets) {
+      if (b.dead || b.zap) continue;
+      // Weapon-specific glow color
+      let gc, gr;
+      if (b.isCoffee)        { gc = 0xFF8A3D; gr = 10; }
+      else if (b.tex === 'staple') { gc = 0xFFD447; gr = 7;  }
+      else if (b.tex === 'plane')  { gc = 0x2EC4B6; gr = 9;  }
+      else                         { gc = 0x7B5CFF; gr = 7;  }
+
+      // Trail line from previous to current position
+      if (b.px !== undefined) {
+        const trailLen = Math.hypot(b.x - b.px, b.y - b.py);
+        if (trailLen > 0.5) {
+          g.lineStyle(gr * 0.8, gc, 0.35);
+          g.beginPath(); g.moveTo(b.px, b.py); g.lineTo(b.x, b.y); g.strokePath();
+        }
+      }
+      // Outer soft glow halo
+      g.fillStyle(gc, 0.10); g.fillCircle(b.x, b.y, gr * 2.0);
+      // Inner glow
+      g.fillStyle(gc, 0.20); g.fillCircle(b.x, b.y, gr * 1.2);
+    }
+
+    // ── Player bullet sprites (on top of glow) ────────────────────
     let bIdx = 0;
     for (const b of this.bullets) {
       if (b.dead || bIdx >= this._bPool.length) continue;
@@ -1589,20 +1646,40 @@ export class BattleScene extends Phaser.Scene {
     }
     for (let i = bIdx; i < this._bPool.length; i++) this._bPool[i].setVisible(false);
 
-    // ── Enemy bullets ─────────────────────────────────────────────
+    // ── Enemy bullets — glow + trail ──────────────────────────────
     for (const b of this.ebullets) {
       if (b.dead) continue;
-      g.fillStyle(0xFF4D6D, 0.9);
-      g.fillCircle(b.x, b.y, 5);
-      g.lineStyle(2, 0x1D1B2E, 1);
-      g.strokeCircle(b.x, b.y, 5);
+      // Trail (velocity-based line behind bullet)
+      if (b.vx !== undefined) {
+        const spd = Math.hypot(b.vx, b.vy) || 1;
+        const tx = b.x - (b.vx/spd) * 10, ty = b.y - (b.vy/spd) * 10;
+        g.lineStyle(4, 0xFF4D6D, 0.22); g.beginPath(); g.moveTo(tx, ty); g.lineTo(b.x, b.y); g.strokePath();
+      }
+      // Glow halo
+      g.fillStyle(0xFF4D6D, 0.18); g.fillCircle(b.x, b.y, 10);
+      // Core
+      g.fillStyle(0xFF4D6D, 0.95); g.fillCircle(b.x, b.y, 5);
+      g.lineStyle(1.8, 0x1D1B2E, 1); g.strokeCircle(b.x, b.y, 5);
     }
 
-    // ── Orbit bullets ────────────────────────────────────────────
+    // ── Orbit bullets — purple glow + arc trail ───────────────────
+    const rageActive = this.player.rage > 0;
     for (const ob of this.orbitBullets) {
       if (!ob.x) continue;
-      g.fillStyle(0x8C95AB, 1); g.fillCircle(ob.x, ob.y, 7);
-      g.lineStyle(2.5, 0x1D1B2E, 1); g.strokeCircle(ob.x, ob.y, 7);
+      const orbitCol = rageActive ? 0xFF8A3D : 0x7B5CFF;
+      // Arc trail from previous position
+      if (ob.px !== undefined) {
+        g.lineStyle(4, orbitCol, 0.4);
+        g.beginPath(); g.moveTo(ob.px, ob.py); g.lineTo(ob.x, ob.y); g.strokePath();
+      }
+      // Outer glow rings
+      g.fillStyle(orbitCol, 0.12); g.fillCircle(ob.x, ob.y, 16);
+      g.fillStyle(orbitCol, 0.22); g.fillCircle(ob.x, ob.y, 11);
+      // Core
+      g.fillStyle(orbitCol, 1); g.fillCircle(ob.x, ob.y, 6.5);
+      g.lineStyle(2, 0x1D1B2E, 0.9); g.strokeCircle(ob.x, ob.y, 6.5);
+      // White shine dot
+      g.fillStyle(0xFFFFFF, 0.7); g.fillCircle(ob.x - 1.5, ob.y - 1.5, 2);
     }
 
     // ── Enemies (sprite pool) ─────────────────────────────────────
