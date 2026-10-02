@@ -1252,7 +1252,10 @@ export class BattleScene extends Phaser.Scene {
     if (this.mash && !this.mash.done) {
       this.mash.count++;
       bus.emit('MASH_UPDATE', { count: this.mash.count });
-      this.boss && (this.boss.hp -= 30 + this.mash.count * 2);
+      if (this.boss && !this.boss.dead) {
+        const mashDmg = 30 + this.mash.count * 2;
+        this._hurtEnemy(this.boss, mashDmg); // ← đúng flow: sẽ gọi _killEnemy/_endBattle nếu boss chết
+      }
     }
 
     // Rage mash
