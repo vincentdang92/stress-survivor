@@ -1012,3 +1012,61 @@ img { max-width: 100%; display: block; }
   .daily-banner { flex-direction: column; align-items: flex-start; }
   .daily-play-btn { width: 100%; }
 }
+
+/* ── Stress Zone Vignettes (GDD) ──────────────────────────────────── */
+.adrenaline-vignette {
+  position: fixed; inset: 0; pointer-events: none; z-index: 4;
+  box-shadow: inset 0 0 80px rgba(255,138,61,0.30);
+  animation: vig-adrenaline 1.8s ease-in-out infinite;
+}
+@keyframes vig-adrenaline { 0%,100%{opacity:.55}50%{opacity:1} }
+.overload-vignette {
+  position: fixed; inset: 0; pointer-events: none; z-index: 4;
+  box-shadow: inset 0 0 100px rgba(255,77,109,0.50);
+  animation: vig-overload .55s ease-in-out infinite;
+}
+@keyframes vig-overload { 0%,100%{opacity:.65}50%{opacity:1} }
+.exhausted-overlay {
+  position: fixed; inset: 0; pointer-events: none; z-index: 4;
+  box-shadow: inset 0 0 120px rgba(44,196,182,0.35);
+  background: rgba(44,196,182,0.06);
+}
+.bar.st i                { background: var(--calm); }
+.bar.st.st-adrenaline i { background: linear-gradient(90deg, var(--calm) 0%, #FF8A3D 100%); }
+.bar.st.st-overload i   { background: linear-gradient(90deg, #FF8A3D 0%, var(--rage) 100%); }
+.bar.st.st-rage i       { background: var(--rage); }
+
+/* ── COMPILE bar ─────────────────────────────────────────────────── */
+.compile-bar { display:flex; align-items:center; gap:5px; margin-top:3px; padding:2px 0; }
+.compile-label { font:700 9px var(--mono); color:var(--calm); letter-spacing:.8px; min-width:54px; }
+.compile-slots { display:flex; gap:2px; }
+.compile-slot { width:9px; height:11px; border-radius:2px; border:1.5px solid rgba(44,196,182,.45); background:transparent; transition:background .1s; }
+.compile-slot.filled { background:var(--calm); box-shadow:0 0 4px var(--calm); }
+.compile-bar.flash .compile-slot.filled { animation:slot-flash .32s infinite; }
+@keyframes slot-flash { 0%,100%{background:var(--calm);box-shadow:0 0 4px var(--calm)}50%{background:var(--sticky);box-shadow:0 0 8px var(--sticky)} }
+.compile-ready-tag { font:800 9px var(--mono); color:var(--sticky); animation:cready .5s infinite; letter-spacing:.5px; }
+@keyframes cready { 0%,100%{opacity:1}50%{opacity:.4} }
+.exhausted-tag { font:700 10px var(--mono); color:var(--calm); margin-top:2px; animation:exblink .6s infinite; }
+@keyframes exblink { 0%,100%{opacity:1}50%{opacity:.25} }
+
+/* ── RAGE early pulse ─────────────────────────────────────────────── */
+.rage-btn.early { border-color:#FF8A3D!important; animation:rage-early .9s infinite; }
+@keyframes rage-early { 0%,100%{box-shadow:3px 3px 0 var(--ink),0 0 0 2px rgba(255,138,61,.4)}50%{box-shadow:3px 3px 0 var(--ink),0 0 0 5px rgba(255,138,61,.75)} }
+
+/* ── Achievement Toast ───────────────────────────────────────────── */
+.ach-toast {
+  position:fixed; bottom:100px; left:50%; transform:translateX(-50%);
+  display:flex; align-items:center; gap:12px;
+  background:var(--ink); color:var(--sticky);
+  border:3px solid var(--sticky); border-radius:14px;
+  padding:10px 18px; z-index:500;
+  box-shadow:0 4px 24px rgba(255,212,71,.35),4px 4px 0 rgba(0,0,0,.4);
+  animation:ach-up .4s cubic-bezier(.34,1.56,.64,1) forwards;
+  white-space:nowrap;
+}
+@keyframes ach-up { from{transform:translateX(-50%) translateY(30px);opacity:0}to{transform:translateX(-50%) translateY(0);opacity:1} }
+.ach-icon { font-size:30px; line-height:1; }
+.ach-body { display:flex; flex-direction:column; gap:2px; }
+.ach-name  { font:700 10px var(--mono); color:rgba(255,212,71,.7); letter-spacing:1px; }
+.ach-title { font:800 15px var(--display); color:var(--sticky); }
+.ach-reward { font:400 11px var(--body); color:var(--calm); }

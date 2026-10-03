@@ -30,14 +30,57 @@ function BossBar({ hp, maxHp, phase }) {
   );
 }
 
+// Developer COMPILE bar
+function CompileBar({ count, max }) {
+  const slots = Array.from({ length: max }, (_, i) => i < count);
+  const remaining = max - count;
+  const flashWarn = remaining > 0 && remaining <= 3;
+  const isReady = count >= max;
+  return (
+    <div class={`compile-bar${flashWarn ? ' flash' : ''}${isReady ? ' ready' : ''}`}>
+      <span class="compile-label">COMPILE</span>
+      <div class="compile-slots">
+        {slots.map((filled, i) => (
+          <div key={i} class={`compile-slot${filled ? ' filled' : ''}`} />
+        ))}
+      </div>
+      {isReady && <span class="compile-ready-tag">READY ✓</span>}
+    </div>
+  );
+}
+
+// Achievement unlock toast
+function AchievementToast({ ach }) {
+  if (!ach) return null;
+  return (
+    <div class="ach-toast" key={ach.key}>
+      <span class="ach-icon">{ach.icon}</span>
+      <div class="ach-body">
+        <div class="ach-name">🏅 Thành tích mở khoá!</div>
+        <div class="ach-title">{ach.name}</div>
+        {ach.reward && <div class="ach-reward">{ach.reward}</div>}
+      </div>
+    </div>
+  );
+}
+
 export function HUD() {
-  const [hud, setHud] = useState({ hp: 100, maxHp: 100, stress: 0, lvl: 1, xp: 0, nextXp: 10, kills: 0, taps: 0, combo: 0, rageActive: false, dashCd: 0, clock: '08:00', wave: '', rageReady: false });
+  const [hud, setHud] = useState({
+    hp: 100, maxHp: 100, stress: 0, lvl: 1, xp: 0, nextXp: 10,
+    kills: 0, taps: 0, combo: 0, rageActive: false, dashCd: 0,
+    clock: '08:00', wave: '', rageReady: false,
+    stressZone: 'calm', compilePct: 0, exhausted: false,
+  });
   const [loadout, setLoadout] = useState({ cards: {}, synActive: new Set() });
   const [boss, setBoss] = useState(null);
-  const [streak, setStreak] = useState(null); // { key, text, color }
+  const [streak, setStreak] = useState(null);
+  const [compile, setCompile] = useState({ count: 0, max: 20 });
+  const [cls, setCls] = useState('');
+  const [ach, setAch] = useState(null);
   const comboRef = useRef(null);
   const prevCombo = useRef(0);
   const streakTimerRef = useRef(null);
+  const achTimerRef = useRef(null);
 
   useEffect(() => {
     const offs = [
@@ -45,12 +88,21 @@ export function HUD() {
       bus.on('LOADOUT_UPDATE', data => setLoadout(data)),
       bus.on('BOSS_HP', data => setBoss(data)),
       bus.on('BOSS_PHASE_CHANGED', data => setBoss(data)),
-      bus.on('BATTLE_STARTED', () => { setBoss(null); setStreak(null); }),
+      bus.on('BATTLE_STARTED', ({ cls: c }) => {
+        setBoss(null); setStreak(null); setCls(c || '');
+        setCompile({ count: 0, max: 20 });
+      }),
+      bus.on('COMPILE_TICK', ({ count, max }) => setCompile({ count, max })),
+      bus.on('ACHIEVEMENT_UNLOCKED', ({ name, icon, reward }) => {
+        clearTimeout(achTimerRef.current);
+        setAch({ name, icon, reward, key: Date.now() });
+        achTimerRef.current = setTimeout(() => setAch(null), 4000);
+      }),
     ];
     return () => offs.forEach(off => off());
   }, []);
 
-  // Combo pop animation
+  // Combo pop
   useEffect(() => {
     if (hud.combo > prevCombo.current && comboRef.current) {
       comboRef.current.classList.remove('pop');
@@ -60,7 +112,7 @@ export function HUD() {
     prevCombo.current = hud.combo;
   }, [hud.combo]);
 
-  // Kill streak announcer — trigger on combo milestones
+  // Kill streak
   useEffect(() => {
     const c = hud.combo;
     let msg = null;
@@ -71,34 +123,43 @@ export function HUD() {
     else if (c > 40 && c % 20 === 0) msg = { text: `👑 × ${c} COMBO!`, color: '#7B5CFF' };
     if (msg) {
       clearTimeout(streakTimerRef.current);
-      // Unique key forces re-mount → re-triggers animation
       setStreak({ ...msg, key: Date.now() });
       streakTimerRef.current = setTimeout(() => setStreak(null), 2100);
     }
   }, [hud.combo]);
 
   const xpPct = hud.nextXp > 0 ? Math.min(100, (hud.xp / hud.nextXp) * 100) : 0;
-  const hpPct = hud.maxHp > 0 ? Math.min(100, (hud.hp / hud.maxHp) * 100) : 0;
-  const stPct = Math.min(100, hud.stress);
+  const hpPct  = hud.maxHp > 0 ? Math.min(100, (hud.hp / hud.maxHp) * 100) : 0;
+  const stPct  = Math.min(100, hud.stress);
   const clockLate = hud.clock && hud.clock >= '09:30';
   const isLowHp = hpPct > 0 && hpPct < 30;
+  const zone = hud.stressZone || 'calm';
 
-  const handleDash = useCallback(() => bus.emit('DASH_PRESSED'), []);
-  const handleRage = useCallback(() => bus.emit('RAGE_PRESSED'), []);
+  const handleDash  = useCallback(() => bus.emit('DASH_PRESSED'), []);
+  const handleRage  = useCallback(() => bus.emit('RAGE_PRESSED'), []);
   const handlePause = useCallback(() => bus.emit('PAUSE'), []);
+
+  const isEarlyRage = hud.stress >= 80 && hud.stress < 100 && !hud.rageActive && hud.rageReady;
+  const isDev = cls === 'developer';
 
   return (
     <>
-      {/* Vignettes — behind everything else */}
+      {/* Stress zone vignettes */}
       {hud.rageActive && <div class="rage-vignette" />}
-      {isLowHp && !hud.rageActive && <div class="hp-danger-vignette" />}
+      {zone === 'adrenaline' && !hud.rageActive && <div class="adrenaline-vignette" />}
+      {zone === 'overload'   && !hud.rageActive && <div class="overload-vignette" />}
+      {hud.exhausted && <div class="exhausted-overlay" />}
+      {isLowHp && !hud.rageActive && zone === 'calm' && <div class="hp-danger-vignette" />}
 
-      {/* Kill streak announcer */}
+      {/* Kill streak */}
       {streak && (
         <div key={streak.key} class="streak-msg" style={{ color: streak.color }}>
           {streak.text}
         </div>
       )}
+
+      {/* Achievement toast */}
+      <AchievementToast ach={ach} />
 
       {/* XP Bar */}
       <div class="xpbar"><i class="xp-fill" style={{ width: xpPct + '%' }} /></div>
@@ -107,14 +168,21 @@ export function HUD() {
       <div class="hud">
         <div class="hud-top">
           <div class="hud-left">
-            <div class={`bar hp`}>
+            <div class="bar hp">
               <i style={{ width: hpPct + '%' }} />
               <span>{Math.ceil(hud.hp)} / {hud.maxHp}</span>
             </div>
-            <div class={`bar st${stPct >= 100 ? ' full' : ''}`}>
+            <div class={`bar st${stPct >= 100 ? ' full' : ''} st-${zone}`}>
               <i style={{ width: stPct + '%' }} />
               <span>STRESS {Math.round(stPct)}%</span>
             </div>
+            {/* COMPILE bar — developer only */}
+            {isDev && (
+              <CompileBar count={compile.count} max={compile.max} />
+            )}
+            {hud.exhausted && (
+              <div class="exhausted-tag">💤 KIỆT SỨC</div>
+            )}
             <div class="lvl-line">LV <b>{hud.lvl}</b> · {hud.kills} hạ · {hud.taps} đập</div>
           </div>
 
@@ -127,10 +195,7 @@ export function HUD() {
             <button class="icon-btn" onClick={handlePause} aria-label="Tạm dừng">❚❚</button>
             <div class="combo-display" ref={comboRef}>
               {hud.combo >= 2 && (
-                <>
-                  x{hud.combo}
-                  <small>COMBO</small>
-                </>
+                <>x{hud.combo}<small>COMBO</small></>
               )}
             </div>
           </div>
@@ -157,8 +222,14 @@ export function HUD() {
         <button class={`act${hud.dashCd > 0 ? ' cooldown' : ''}`} onClick={handleDash} aria-label="Né">
           NÉ<small>SHIFT</small>
         </button>
-        <button class={`act rage-btn${hud.rageReady ? ' ready' : ''}`} onClick={handleRage} aria-label="Rage">
-          RAGE<small>SPACE</small>
+        <button
+          class={`act rage-btn${hud.rageReady && !hud.rageActive ? ' ready' : ''}${isEarlyRage ? ' early' : ''}`}
+          onClick={handleRage}
+          aria-label="Rage"
+        >
+          {isEarlyRage
+            ? <><span>RAGE</span><small>SỚM</small></>
+            : <><span>RAGE</span><small>SPACE</small></>}
         </button>
       </div>
     </>

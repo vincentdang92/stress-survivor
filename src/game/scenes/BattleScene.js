@@ -333,7 +333,7 @@ export class BattleScene extends Phaser.Scene {
     const st = {
       dmgMul: upgBonuses.atkMul, atkSpd: 1,
       crit: 0.05 + upgBonuses.critBonus,
-      moveMul: upgBonuses.spdMul, pickup: 70,
+      moveMul: upgBonuses.spdMul, pickup: 80, // GDD: 80px gem range
       dr: 0, stressGain: Math.max(0.3, 1 - upgBonuses.stressResist),
       regen: 0, extraProj: 0,
       burnAll: 0, burnMul: 1,
@@ -487,6 +487,16 @@ export class BattleScene extends Phaser.Scene {
     this.wifiDown = 0;         // wifi-drop event timer
     this.powerOutTimer = 0;    // power-cut event timer
 
+    // Achievement tracking (per-run counters)
+    this.achCompiles = 0;        // COMPILE events this run
+    this.achBugKills = 0;        // bug enemies killed
+    this.achEvolutions = 0;      // weapon evolutions triggered
+    this.achRageUsed = false;    // whether RAGE was triggered
+    this.achSurv840 = false;     // survived to 08:40 (t=300)
+    this.achSurvBoss = false;    // survived to boss spawn (t=900)
+    this.achMilestones = new Set(); // prevent duplicate checks
+
+
     // Trial mode: 30 seconds then end
     if (this.trial) this.trialTimeLeft = 30;
 
@@ -519,6 +529,11 @@ export class BattleScene extends Phaser.Scene {
     const dt = Math.min(rawDt / 1000, 0.05); // cap at 50ms
     this.elapsed += dt;
     if (this.trial) { this.trialTimeLeft -= dt; if (this.trialTimeLeft <= 0) { this._endBattle(false, true); return; } }
+
+    // Achievement milestone checks
+    if (this.elapsed >= 300 && !this.achSurv840) { this.achSurv840 = true; this._checkAchievement('survive_840'); }
+    if (this.elapsed >= 900 && !this.achSurvBoss) { this.achSurvBoss = true; this._checkAchievement('survive_boss'); }
+
 
     this._updatePlayer(dt);
     // Process pending terminal bursts
@@ -1786,7 +1801,11 @@ export class BattleScene extends Phaser.Scene {
       }
     }
     // Bug decal
-    if (e.type === 'bug') this.decals.push({ x: e.x, y: e.y, r: e.r * 1.1, life: 6, color: 0x9BDD8C });
+    if (e.type === 'bug') {
+      this.decals.push({ x: e.x, y: e.y, r: e.r * 1.1, life: 6, color: 0x9BDD8C });
+      this.achBugKills = (this.achBugKills || 0) + 1;
+    }
+
     // Pun text
     const punList = PUNS[e.type];
     if (punList && this.rng.bool(0.25)) {
@@ -1904,7 +1923,9 @@ export class BattleScene extends Phaser.Scene {
         this._showBanner('COMPILED ✓', 'Code chạy ngon!', 'rage');
         this.cameras.main.shake(180, 0.008);
         SFX.boom();
+        this.achCompiles = (this.achCompiles || 0) + 1;
         bus.emit('COMPILE_TICK', { count: 0, max: compileThreshold });
+
       }
     }
   }
@@ -1959,6 +1980,8 @@ export class BattleScene extends Phaser.Scene {
   _doRage(auto = false) {
     const p = this.player;
     if (p.rage > 0) return; // already raging
+    this.achRageUsed = true; // track for "win without rage" achievement
+
     // Shockwave burst
     const radius = 280;
     for (const e of this.enemies) {
@@ -1996,10 +2019,11 @@ export class BattleScene extends Phaser.Scene {
   _tryDash() {
     const p = this.player;
     if (p.dashCd > 0) return;
-    p.dashCd = 1.1; p.dashT = 0.17;
+    // GDD: 140px dash, 0.25s invincible, 4s CD
+    p.dashCd = 4.0; p.dashT = 0.25;
     const len = Math.sqrt(p.fx * p.fx + p.fy * p.fy) || 1;
-    p.dvx = (p.fx / len) * 520; p.dvy = (p.fy / len) * 520;
-    p.invincible = 0.17;
+    p.dvx = (p.fx / len) * 560; p.dvy = (p.fy / len) * 560;
+    p.invincible = 0.25;
     SFX.dash();
   }
 
@@ -2071,6 +2095,9 @@ export class BattleScene extends Phaser.Scene {
     this.cards[evo.result] = 5; // evolved weapons at max level
     this.weaponTimers[evo.result] = 0;
     this._recompute();
+    this.achEvolutions = (this.achEvolutions || 0) + 1;
+    if (this.achEvolutions >= 3) this._checkAchievement('evolutions_3');
+
     this._showBanner(`✨ TIẾN HÓA · ${evo.name}`, evo.desc, 'syn');
     this.cameras.main.flash(700, 255, 215, 0, true);
     this.cameras.main.shake(450, 0.012);
@@ -2102,6 +2129,13 @@ export class BattleScene extends Phaser.Scene {
     this.state = 'ended';
     this.paused = true;
     if (won) SFX.win(); else SFX.lose();
+
+    // Achievement checks at end of battle
+    if (won && !this.achRageUsed) this._checkAchievement('win_no_rage');
+    this._checkAchievement('compile_50');
+    this._checkAchievement('kill_200_bug');
+    this._checkAchievement('evolutions_3');
+
     bus.emit('BATTLE_COMPLETED', {
       won, trial,
       daily: this.daily,
@@ -2115,6 +2149,52 @@ export class BattleScene extends Phaser.Scene {
       cards: this.cards, synActive: [...this.synActive],
     });
   }
+
+  // ── Achievements ──────────────────────────────────────────────────────
+  _checkAchievement(id) {
+    try {
+      const KEY = 'ss_ach_v1';
+      const saved = JSON.parse(localStorage.getItem(KEY) || '{}');
+      if (saved[id]) return; // already unlocked
+
+      // Condition checks
+      const met = (() => {
+        switch (id) {
+          case 'survive_840':  return this.achSurv840;
+          case 'survive_boss': return this.achSurvBoss;
+          case 'compile_50':   return this.achCompiles >= 50;
+          case 'kill_200_bug': return this.achBugKills >= 200;
+          case 'win_no_rage':  return !this.achRageUsed;
+          case 'evolutions_3': return this.achEvolutions >= 3;
+          default: return false;
+        }
+      })();
+      if (!met) return;
+
+      // Unlock!
+      saved[id] = true;
+      localStorage.setItem(KEY, JSON.stringify(saved));
+      const LABELS = {
+        survive_840:  { name: 'Trụ Buổi Sáng',           icon: '⏰', reward: '+100 Vàng' },
+        survive_boss: { name: 'Đối Mặt Deadline',          icon: '🏆', reward: 'Mở nhân vật Manager' },
+        compile_50:   { name: 'Bộ Ngón Tay Vàng',          icon: '⌨️', reward: '+200 Vàng' },
+        kill_200_bug: { name: 'Sát Trùng Chuyên Nghiệp',   icon: '🐛', reward: '+150 Vàng' },
+        win_no_rage:  { name: 'Phật Tâm',                  icon: '🧘', reward: 'Outfit: Senior' },
+        evolutions_3: { name: 'Nhà Giả Kim',               icon: '✨', reward: '+500 Vàng' },
+      };
+      const info = LABELS[id] || { name: id, icon: '🏅', reward: '' };
+      // Gold reward
+      const goldRewards = { survive_840: 100, compile_50: 200, kill_200_bug: 150, evolutions_3: 500 };
+      const goldReward = goldRewards[id] || 0;
+      if (goldReward > 0) {
+        const u = JSON.parse(localStorage.getItem('ss_upgrades_v1') || '{}');
+        u.gold = (u.gold || 0) + goldReward;
+        localStorage.setItem('ss_upgrades_v1', JSON.stringify(u));
+      }
+      bus.emit('ACHIEVEMENT_UNLOCKED', { id, name: info.name, icon: info.icon, reward: info.reward });
+    } catch { /* ignore storage errors */ }
+  }
+
 
   // ── Pause ─────────────────────────────────────────────────────────────
   _pause() { this.paused = true; bus.emit('PAUSED', {}); }
