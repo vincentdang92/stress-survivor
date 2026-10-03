@@ -8,6 +8,7 @@ export const ENEMIES = {
   meeting:  { r: 22, hp: 68,   spd: 70,  dmg: 8,  xp: 3, kb: 0.45, color: '#E8E4F2', bug: false, charge: false, boss: false },
   bug:      { r: 15, hp: 25,   spd: 110, dmg: 6,  xp: 2, kb: 0.8,  color: '#7FD66B', bug: true,  charge: false, boss: false },
   customer: { r: 18, hp: 120,  spd: 68,  dmg: 18, xp: 6, kb: 0.6,  color: '#FF7A45', bug: false, charge: true,  boss: false },
+  elite: { r: 26, hp: 400, spd: 72, dmg: 10, xp: 25, kb: 0.2, color: '#CE93D8', bug: false, charge: false, boss: false },
   boss:     { r: 46, hp: 6000, spd: 46,  dmg: 24, xp: 0, kb: 0.04, color: '#FF4D6D', bug: false, charge: false, boss: true  },
 };
 
@@ -156,6 +157,36 @@ export const CARDS = [
     stat: (s, l) => { s.pickup += 20 * l; s.aoeBonus = (s.aoeBonus || 0) + 0.1 * l; },
     desc: l => `Hút gem xa hơn (+${20*l}px), AoE/Tầm +${10*l}%. Dùng tiến hóa Rubber Duck.`,
   },
+  {
+    id: 'stack_overflow', icon: '📚', name: 'Stack Overflow',
+    type: 'weapon', rarity: 'rare', tags: ['developer', 'aoe'],
+    cd: l => 3.2 - l * 0.2,
+    desc: l => `Thả ${l >= 4 ? 2 : 1} chồng sách vào nhóm địch đông nhất sau 0.4s, ${Math.round(30 * (1 + 0.25*(l-1)))} sát thương AoE ${80 + 10*l}px.`,
+  },
+  {
+    id: 'console_log', icon: '🔍', name: 'Console.log',
+    type: 'weapon', rarity: 'rare', tags: ['developer', 'debuff'],
+    cd: l => 2.8 - l * 0.1,
+    desc: l => `Đánh dấu ${1 + Math.floor(l/2)} địch gần nhất — chúng nhận thêm +${20 + l*4}% sát thương trong 4s.`,
+  },
+  {
+    id: 'cron_job', icon: '⏱️', name: 'Cron Job',
+    type: 'weapon', rarity: 'epic', tags: ['developer', 'aoe'],
+    cd: l => 10 - l * 0.8,
+    desc: l => `Mỗi ${(10 - l*0.8).toFixed(1)}s: đánh TẤT CẢ địch trong màn, ${Math.round(15 * (1 + 0.25*(l-1)))} sát thương.`,
+  },
+  {
+    id: 'ctrl_c', icon: '📋', name: 'Ctrl+C / Ctrl+V',
+    type: 'passive', rarity: 'rare', tags: ['developer', 'pierce'],
+    stat: (s, l) => { s.extraProj += (l >= 2 ? 1 : 0) + (l >= 4 ? 1 : 0); s.pierce = (s.pierce || 0) + l; },
+    desc: l => `+${l >= 4 ? 2 : l >= 2 ? 1 : 0} đạn phụ, xuyên +${l}. Dùng để tiến hóa Stack Overflow.`,
+  },
+  {
+    id: 'standup', icon: '🕐', name: 'Stand-up 15 phút',
+    type: 'passive', rarity: 'rare', tags: ['developer', 'heal'],
+    stat: (s, l) => { s.regen += 0.3 * l; },
+    desc: l => `Hồi máu +${(0.3*l).toFixed(1)}/s, gây stun 0.5s cho địch gần nhất mỗi 60s. Dùng để tiến hóa Cron Job.`,
+  },
   // ── Evolved weapons (result of evolution — NOT in offer pool) ────────
   {
     id: 'code_2am', icon: '🌙', name: 'Code lúc 2h Sáng',
@@ -187,6 +218,24 @@ export const CARDS = [
     cd: null,
     desc: () => '6 vịt bay quanh người; Trúng BUG: x3 sát thương (cộng dồn Debug Mode).',
   },
+  {
+    id: 'stack_paste', icon: '📋', name: 'Copy-Paste from Stack Overflow',
+    type: 'weapon', rarity: 'evolved', tags: ['developer', 'aoe'],
+    cd: () => 2.5,
+    desc: () => '2 chồng sách rơi cùng lúc vào 2 nhóm địch đông nhất, mỗi chồng AoE 130px, 80 sát thương.',
+  },
+  {
+    id: 'breakpoint', icon: '🔴', name: 'Breakpoint',
+    type: 'weapon', rarity: 'evolved', tags: ['developer', 'debuff'],
+    cd: () => 2.0,
+    desc: () => 'Đánh dấu 4 địch gần nhất (+40% dmg 6s). Địch đang bị đánh dấu có <20% HP → chết ngay.',
+  },
+  {
+    id: 'cicd_pipeline', icon: '🔄', name: 'CI/CD Pipeline',
+    type: 'weapon', rarity: 'evolved', tags: ['developer', 'aoe'],
+    cd: () => 7.0,
+    desc: () => 'Đánh TẤT CẢ địch trong màn, 50 sát thương. Mỗi kill hồi 1 HP.',
+  },
 ];
 export const CARD = Object.fromEntries(CARDS.map(c => [c.id, c]));
 
@@ -197,6 +246,9 @@ export const EVOLUTIONS = [
   { weapon: 'hotfix',   passive: 'shoes',           result: 'deploy_friday', name: 'Deploy Ngày Thứ Sáu',      desc: 'AoE 250px · 15% tự gây dmg' },
   { weapon: 'plane',    passive: 'unit_test',       result: 'force_push',    name: 'Force Push',               desc: 'Luồng siêu rộng · hủy đạn địch' },
   { weapon: 'mouse',    passive: 'second_monitor',  result: 'rubber_debug',  name: 'Rubber Duck Debugging',    desc: '6 vịt · x3 sát thương lên BUG' },
+  { weapon: 'stack_overflow', passive: 'ctrl_c',    result: 'stack_paste',   name: 'Copy-Paste from Stack Overflow', desc: '2 bom sách · 2 vị trí đồng thời' },
+  { weapon: 'console_log',   passive: 'glasses',   result: 'breakpoint',    name: 'Breakpoint',                    desc: 'Đánh dấu + instant-kill <20% HP' },
+  { weapon: 'cron_job',      passive: 'standup',   result: 'cicd_pipeline', name: 'CI/CD Pipeline',                desc: 'Đánh toàn màn + +1HP mỗi kill' },
 ];
 
 // ── Synergies ─────────────────────────────────────────────────────────────
@@ -218,7 +270,7 @@ export const CLASSES = {
     passive: 'Debug Mode', pdesc: '+30% sát thương lên địch BUG. Rubber Duck gây x3 lên BUG.',
     tap: 'Tap trúng địch: 8 sát thương + cộng 1 ô COMPILE (20 ô). Đủ 20 ô → COMPILE: bắn 16 ký tự tỏa tròn, 20 sát thương + đẩy lùi 60px. Ở Overload (90%+): 10% Build failed!',
     lore: 'Một developer full-stack thứ thiệt. Uống cà phê thay nước, ngủ cùng bug, và tự hào về commit "fix typo" lúc 3 giờ sáng.',
-    weapons: ['stapler', 'mouse', 'hotfix', 'terminal', 'deploy', 'keyboard', 'plane'],
+    weapons: ['stapler', 'mouse', 'hotfix', 'terminal', 'deploy', 'keyboard', 'plane', 'stack_overflow', 'console_log', 'cron_job'],
     passives: ['rubber_duck', 'glasses', 'espresso'],
     soon: false,
   },

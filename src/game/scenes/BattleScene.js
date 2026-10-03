@@ -297,6 +297,7 @@ export class BattleScene extends Phaser.Scene {
       devTaps: 0,        // developer compile counter
       standingFor: 0,         // for Deep Work evolution
       manageTapCd: 0,
+      tapCd: 0,
     };
     this.cards = { [C.start]: 1 };
     this.weaponTimers = { [C.start]: 0.4 };
@@ -543,6 +544,24 @@ export class BattleScene extends Phaser.Scene {
         return false;
       });
     }
+
+    // Process pending book drops (Stack Overflow)
+    if (this._pendingBooks?.length) {
+      this._pendingBooks = this._pendingBooks.filter(b => {
+        b.delay -= dt;
+        if (b.delay > 0) return true;
+        for (const e of this.enemies) {
+          if (!e.dead && Math.hypot(e.x - b.x, e.y - b.y) < b.radius + e.r) {
+            this._hurtEnemy(e, b.dmg);
+          }
+        }
+        this.particles.push({ type: 'ring',  x: b.x, y: b.y, r: 0, maxR: b.radius,     life: 0.3,  max: 0.3,  color: 0xFFD447 });
+        this.particles.push({ type: 'burst', x: b.x, y: b.y, vx: 0, vy: 0,             life: 0.15, max: 0.15, color: 0xFFD447, size: b.radius * 0.5 });
+        SFX.boom();
+        return false;
+      });
+    }
+
     this._updateWeapons(dt);
     this._updateOrbit(dt);
     this._updateBullets(dt);
@@ -558,6 +577,8 @@ export class BattleScene extends Phaser.Scene {
     this._updateStress(dt);
     this._updateWaves(dt);
     this._checkBoss(dt);
+    this._updateBossRing(dt);
+    this._updateBossCharge(dt);
     this._checkRegen(dt);
     this._updateHUD(dt);
     this._checkLevelUp();
@@ -625,12 +646,25 @@ export class BattleScene extends Phaser.Scene {
     if (p.hitFlash > 0) p.hitFlash -= dt;
     if (p.invincible > 0) p.invincible -= dt;
 
+    // Manage stamp cooldown
+    if (p.manageTapCd > 0) p.manageTapCd -= dt;
+    if (p.tapCd > 0) p.tapCd -= dt;
+
+    // Meeting pull: attracts player within 200px (GDD)
+    for (const e of this.enemies) {
+      if (e.dead || e.type !== 'meeting') continue;
+      const dx = e.x - p.x, dy = e.y - p.y;
+      const d = Math.sqrt(dx*dx + dy*dy);
+      if (d > 0 && d < 200) {
+        const pullStr = 55 * (1 - d / 200); // weaker at range, stronger close
+        p.x += (dx / d) * pullStr * dt;
+        p.y += (dy / d) * pullStr * dt;
+      }
+    }
+
     // Bound to world
     p.x = Phaser.Math.Clamp(p.x, 30, WORLD * 2 - 30);
     p.y = Phaser.Math.Clamp(p.y, 30, WORLD * 2 - 30);
-
-    // Manage stamp cooldown
-    if (p.manageTapCd > 0) p.manageTapCd -= dt;
   }
 
   // ── Weapons ───────────────────────────────────────────────────────────
@@ -675,6 +709,12 @@ export class BattleScene extends Phaser.Scene {
         case 'deep_work':     this._fireDeepWork(lv); break;
         case 'deploy_friday': this._fireDeployFriday(lv, extraProj); break;
         case 'force_push':    this._fireForcePush(lv, extraProj); break;
+        case 'stack_overflow':  this._fireStackOverflow(lv, extraProj); break;
+        case 'console_log':     this._fireConsoleLog(lv, extraProj); break;
+        case 'cron_job':        this._fireCronJob(lv, extraProj); break;
+        case 'stack_paste':     this._fireStackPaste(lv, extraProj); break;
+        case 'breakpoint':      this._fireBreakpoint(lv, extraProj); break;
+        case 'cicd_pipeline':   this._fireCicdPipeline(lv, extraProj); break;
       }
     }
   }
@@ -917,6 +957,137 @@ export class BattleScene extends Phaser.Scene {
     SFX.shoot();
   }
 
+  _fireStackOverflow(lv, extra) {
+    const p = this.player;
+    const count = (lv >= 4 ? 2 : 1) + (extra > 0 ? 1 : 0);
+    const radius = 80 + 10 * lv;
+    const dmg = Math.round(30 * (1 + 0.25 * (lv - 1)));
+    for (let c = 0; c < count; c++) {
+      // Find cluster for each bomb
+      const nearby = this.enemies.filter(e => !e.dead)
+        .sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y))
+        .slice(c * 4, c * 4 + 8);
+      if (!nearby.length) { nearby.push(...this.enemies.filter(e => !e.dead).slice(0, 4)); }
+      if (!nearby.length) continue;
+      const cx = nearby.reduce((s, e) => s + e.x, 0) / nearby.length;
+      const cy = nearby.reduce((s, e) => s + e.y, 0) / nearby.length;
+      if (!this._pendingBooks) this._pendingBooks = [];
+      this._pendingBooks.push({ x: cx, y: cy, delay: 0.4, dmg, radius });
+      // Visual: indicator circle at target
+      this.particles.push({ type: 'ring', x: cx, y: cy, r: radius, maxR: radius + 20, life: 0.4, max: 0.4, color: 0xFFD447 });
+    }
+    SFX.shoot();
+  }
+
+  _fireConsoleLog(lv, extra) {
+    const p = this.player;
+    const count = 1 + Math.floor(lv / 2) + (extra > 0 ? 1 : 0);
+    const bonus = 0.20 + lv * 0.04;
+    const dur = 4;
+    // Mark nearest enemies
+    const targets = this.enemies.filter(e => !e.dead)
+      .sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y))
+      .slice(0, count);
+    for (const t of targets) {
+      t.marked = { timer: dur, bonus };
+      // Visual: little inspect icon
+      this.damageTexts.push({ x: t.x, y: t.y - t.r - 10, txt: `🔍+${Math.round(bonus*100)}%`, color: '#2EC4B6', life: 1.0, alpha: 1 });
+    }
+    if (targets.length) SFX.tap();
+  }
+
+  _fireCronJob(lv, extra) {
+    const cam = this.cameras.main;
+    const dmg = Math.round(15 * (1 + 0.25 * (lv - 1)));
+    let hits = 0;
+    const vw = cam.width + 100, vh = cam.height + 100;
+    for (const e of this.enemies) {
+      if (e.dead) continue;
+      if (e.x >= cam.scrollX - 50 && e.x <= cam.scrollX + vw &&
+          e.y >= cam.scrollY - 50 && e.y <= cam.scrollY + vh) {
+        this._hurtEnemy(e, dmg);
+        // Visual spark on each enemy
+        this.particles.push({ type: 'burst', x: e.x, y: e.y, vx: 0, vy: 0, life: 0.12, max: 0.12, color: 0xFFD447, size: 10 });
+        hits++;
+      }
+    }
+    if (hits > 0) {
+      this._showBanner('⏱️ CRON JOB', `${hits} địch bị đánh!`, 'wave');
+      this.cameras.main.shake(150, 0.007);
+      SFX.boom();
+    }
+  }
+
+  _fireStackPaste(lv, extra) {
+    // Evolved Stack Overflow: 2 bombs at 2 different clusters
+    const p = this.player;
+    if (!this._pendingBooks) this._pendingBooks = [];
+    const sortedByDist = this.enemies.filter(e => !e.dead)
+      .sort((a, b) => Math.hypot(a.x-p.x,a.y-p.y) - Math.hypot(b.x-p.x,b.y-p.y));
+    // Cluster 1
+    const c1 = sortedByDist.slice(0, 6);
+    if (c1.length) {
+      const cx = c1.reduce((s,e)=>s+e.x,0)/c1.length, cy = c1.reduce((s,e)=>s+e.y,0)/c1.length;
+      this._pendingBooks.push({ x: cx, y: cy, delay: 0.3, dmg: 80, radius: 130 });
+      this.particles.push({ type: 'ring', x: cx, y: cy, r: 0, maxR: 130, life: 0.3, max: 0.3, color: 0xFFD447 });
+    }
+    // Cluster 2 (next group)
+    const c2 = sortedByDist.slice(6, 14);
+    if (c2.length) {
+      const cx = c2.reduce((s,e)=>s+e.x,0)/c2.length, cy = c2.reduce((s,e)=>s+e.y,0)/c2.length;
+      this._pendingBooks.push({ x: cx, y: cy, delay: 0.35, dmg: 80, radius: 130 });
+      this.particles.push({ type: 'ring', x: cx, y: cy, r: 0, maxR: 130, life: 0.3, max: 0.3, color: 0xFFD447 });
+    }
+    this.cameras.main.shake(100, 0.005);
+    SFX.shoot();
+  }
+
+  _fireBreakpoint(lv, extra) {
+    // Evolved Console.log: mark 4 enemies + kill if <20% HP
+    const p = this.player;
+    const count = 4 + (extra || 0);
+    const targets = this.enemies.filter(e => !e.dead)
+      .sort((a, b) => Math.hypot(a.x-p.x,a.y-p.y) - Math.hypot(b.x-p.x,b.y-p.y))
+      .slice(0, count);
+    for (const t of targets) {
+      t.marked = { timer: 6, bonus: 0.40 };
+      if (t.hp / t.maxHp < 0.20) {
+        // Instant kill! (breakpoint hit)
+        this._hurtEnemy(t, t.hp * 10);
+        this.damageTexts.push({ x: t.x, y: t.y - 20, txt: '🔴 BREAKPOINT', color: '#FF4D6D', life: 1.0, alpha: 1 });
+      } else {
+        this.damageTexts.push({ x: t.x, y: t.y - t.r - 10, txt: `🔴+40%`, color: '#2EC4B6', life: 1.0, alpha: 1 });
+      }
+    }
+    SFX.tap();
+  }
+
+  _fireCicdPipeline(lv, extra) {
+    // Evolved Cron Job: all visible enemies + +1HP per kill
+    const cam = this.cameras.main;
+    const dmg = 50;
+    let kills = 0;
+    const before = this.kills;
+    const vw = cam.width + 100, vh = cam.height + 100;
+    for (const e of this.enemies) {
+      if (e.dead) continue;
+      if (e.x >= cam.scrollX - 50 && e.x <= cam.scrollX + vw &&
+          e.y >= cam.scrollY - 50 && e.y <= cam.scrollY + vh) {
+        this._hurtEnemy(e, dmg);
+        this.particles.push({ type: 'burst', x: e.x, y: e.y, vx: 0, vy: 0, life: 0.12, max: 0.12, color: 0x7B5CFF, size: 12 });
+      }
+    }
+    const healAmount = (this.kills - before);
+    if (healAmount > 0) {
+      this.player.hp = Math.min(this.player.maxHp, this.player.hp + healAmount);
+      this._showBanner('🔄 CI/CD PIPELINE', `+${healAmount} HP từ kills!`, 'syn');
+    } else {
+      this._showBanner('🔄 CI/CD PIPELINE', 'Quét toàn màn!', 'syn');
+    }
+    this.cameras.main.shake(200, 0.009);
+    SFX.boom();
+  }
+
   // ── Orbit (mouse weapon) ──────────────────────────────────────────────
   _updateOrbit(dt) {
     const lv = this.cards['mouse'] || 0;
@@ -1030,6 +1201,9 @@ export class BattleScene extends Phaser.Scene {
         if (Math.abs(e.kvx) < 1 && Math.abs(e.kvy) < 1) { e.kvx = 0; e.kvy = 0; }
       }
 
+      // Console.log mark decay
+      if (e.marked) { e.marked.timer -= dt; if (e.marked.timer <= 0) { e.marked = null; } }
+
       // AI movement
       const dx = p.x - e.x, dy = p.y - e.y;
       const dist = Math.hypot(dx, dy) || 1;
@@ -1080,33 +1254,71 @@ export class BattleScene extends Phaser.Scene {
   }
 
   _updateBoss(boss, dt, dx, dy, dist) {
-    boss.shotTimer = (boss.shotTimer || 0) - dt;
-    if (boss.shotTimer <= 0) {
-      if (boss.phase === 2) {
-        // Phase 2: 16-bullet ring + 3 aimed at player
-        this._bossShoot(boss, 16, false);
-        for (let i = 0; i < 3; i++) {
-          const angle = Math.atan2(dy, dx) + (i - 1) * 0.25;
-          this.ebullets.push({ x: boss.x, y: boss.y, vx: Math.cos(angle) * 280, vy: Math.sin(angle) * 280, dmg: boss.T.dmg, life: 4 });
-        }
-        // Spawn email minions
-        if (this.enemies.length < MAX_ENEMIES - 5) {
-          for (let i = 0; i < 3; i++) this._spawnEnemy('email');
-        }
-        boss.shotTimer = 1.8;
-      } else {
-        this._bossShoot(boss, 10, false);
-        boss.shotTimer = 2.3;
-      }
-      SFX.bossShot();
+    // Left empty or handle basic AI if needed, shooting is handled in _updateBossRing
+  }
+
+  _updateBossRing(dt) {
+    const boss = this.boss;
+    if (!boss) return;
+    const phase2 = boss.hp / boss.maxHp < 0.5;
+    const rotSpeed = phase2 ? 1.6 : 0.9;
+    boss.ringDir = phase2 ? -1 : 1;
+    boss.ringAngle = (boss.ringAngle || 0) + rotSpeed * boss.ringDir * dt;
+    boss.ringTimer = (boss.ringTimer || 0) + dt;
+    const fireRate = phase2 ? 0.35 : 0.55;
+    if (boss.ringTimer < fireRate) return;
+    boss.ringTimer = 0;
+    const bulletCount = phase2 ? 18 : 14;
+    const gapSize = phase2 ? 0.28 : 0.38; // radian half-width of each gap
+    for (let i = 0; i < bulletCount; i++) {
+      const angle = (i / bulletCount) * Math.PI * 2 + boss.ringAngle;
+      // 2 gaps: at ringAngle and ringAngle + PI
+      const norm = ((angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+      const gap1 = ((boss.ringAngle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+      const gap2 = ((boss.ringAngle + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+      const diff1 = Math.abs(norm - gap1);
+      const diff2 = Math.abs(norm - gap2);
+      const inGap1 = Math.min(diff1, Math.PI * 2 - diff1) < gapSize;
+      const inGap2 = Math.min(diff2, Math.PI * 2 - diff2) < gapSize;
+      if (inGap1 || inGap2) continue;
+      const spd = phase2 ? 220 : 170;
+      this.ebullets.push({ x: boss.x, y: boss.y, vx: Math.cos(angle) * spd, vy: Math.sin(angle) * spd, dmg: boss.T.dmg * 0.5, life: 5 });
     }
   }
 
-  _bossShoot(boss, count, aimed) {
+  _updateBossCharge(dt) {
+    const boss = this.boss;
+    if (!boss || boss.hp / boss.maxHp >= 0.5) return; // Phase 2 only
     const p = this.player;
-    for (let i = 0; i < count; i++) {
-      const angle = (i / count) * TAU + (this.elapsed * 0.5);
-      this.ebullets.push({ x: boss.x, y: boss.y, vx: Math.cos(angle) * 220, vy: Math.sin(angle) * 220, dmg: boss.T.dmg * 0.6, life: 5 });
+    boss.chargeTimer = (boss.chargeTimer || 6) - dt;
+    if (boss.chargePhase === 'idle' && boss.chargeTimer <= 0) {
+      // Windup: glow and telegraph
+      boss.chargePhase = 'windup';
+      boss.chargeWindup = 1.0;
+      this.particles.push({ type: 'ring', x: boss.x, y: boss.y, r: 0, maxR: 80, life: 1.0, max: 1.0, color: 0xFF4D6D });
+    }
+    if (boss.chargePhase === 'windup') {
+      boss.chargeWindup -= dt;
+      if (boss.chargeWindup <= 0) {
+        // Launch charge
+        boss.chargePhase = 'charge';
+        boss.chargeDur = 0.6;
+        const ang = Math.atan2(p.y - boss.y, p.x - boss.x);
+        boss.chargeVx = Math.cos(ang) * 800;
+        boss.chargeVy = Math.sin(ang) * 800;
+        this.cameras.main.shake(150, 0.007);
+        SFX.boom();
+      }
+    }
+    if (boss.chargePhase === 'charge') {
+      boss.x += boss.chargeVx * dt;
+      boss.y += boss.chargeVy * dt;
+      boss.chargeDur -= dt;
+      if (boss.chargeDur <= 0) {
+        boss.chargePhase = 'idle';
+        boss.chargeTimer = 6;
+        boss.chargeVx = 0; boss.chargeVy = 0;
+      }
     }
   }
 
@@ -1128,6 +1340,12 @@ export class BattleScene extends Phaser.Scene {
             this.player.hp = Math.min(this.player.maxHp, this.player.hp + 30);
             this._showBanner('🎂 Ngon!', '+30 HP — Chúc mừng sinh nhật!', 'syn');
             SFX.level();
+          } else if (gem.isPackage) {
+            // Evolution package — trigger evolution check
+            this._checkEvolution();
+            this._showBanner('📦 Gói hàng Shipper!', 'Kiểm tra tiến hóa vũ khí...', 'syn');
+            SFX.level();
+            this.cameras.main.flash(500, 255, 215, 0, true);
           } else {
             this._giveXp(gem.xp);
           }
@@ -1314,6 +1532,16 @@ export class BattleScene extends Phaser.Scene {
         this._spawnFromWave(currentWave);
       }
     }
+
+    // Elite spawns: 1 Elite per 60s starting from t=225 (wave 2 starts)
+    if (this.elapsed >= 225 && !this.bossSpawned) {
+      const eliteInterval = 60;
+      const eliteIdx = Math.floor((this.elapsed - 225) / eliteInterval);
+      if (eliteIdx > (this.lastEliteIdx || -1)) {
+        this.lastEliteIdx = eliteIdx;
+        this._spawnElite();
+      }
+    }
   }
 
   _spawnFromWave(wave) {
@@ -1342,6 +1570,18 @@ export class BattleScene extends Phaser.Scene {
     });
   }
 
+  _spawnElite() {
+    const p = this.player;
+    const ang = this.rng.next() * Math.PI * 2;
+    const dist = 500 + this.rng.next() * 200;
+    const x = Phaser.Math.Clamp(p.x + Math.cos(ang) * dist, 60, 2340);
+    const y = Phaser.Math.Clamp(p.y + Math.sin(ang) * dist, 60, 2340);
+    const T = { ...ENEMIES.elite };
+    T.hp = scaledHp(T.hp, this.elapsed);
+    this.enemies.push({ x, y, type: 'elite', T, r: T.r, hp: T.hp, maxHp: T.hp, vx: 0, vy: 0, kvx: 0, kvy: 0, dead: false, flash: 0, stamps: 0, burnStacks: [] });
+    this._showBanner('📧 Email CC cả công ty!', 'Elite xuất hiện — hạ để nhận Gói hàng', 'wave');
+  }
+
   _spawnBoss() {
     this.bossSpawned = true;
     const p = this.player;
@@ -1350,8 +1590,9 @@ export class BattleScene extends Phaser.Scene {
       type: 'boss', T, x: p.x + 400, y: p.y,
       r: T.r, hp: T.hp, maxHp: T.hp, dead: false,
       kvx: 0, kvy: 0, flash: 0, burnStacks: [], stamps: 0,
-      chargeTimer: 0, charging: false, winding: 0,
+      chargeTimer: 6, charging: false, winding: 0,
       shotTimer: 1, phase: 1,
+      ringAngle: 0, ringDir: 1, chargePhase: 'idle', chargeVx: 0, chargeVy: 0,
     };
     this.enemies.push(this.boss);
     this._showBanner('⏰ DEADLINE!', '10:00 · Boss xuất hiện', 'wave');
@@ -1437,6 +1678,8 @@ export class BattleScene extends Phaser.Scene {
     const rageMul = this.player.rage > 0 ? 2.5 : 1;
 
     let d = baseDmg * st.dmgMul * adrenalineMul * rageMul;
+    // Console.log mark: bonus damage
+    if (e.marked && e.marked.timer > 0) d *= (1 + e.marked.bonus);
     if (e.T.bug) d *= st.bugMul * (opts.bugX || 1);
     if (this.cls === 'manager' && e.stamps > 0) d *= 1.15;
     const crit = this.rng.next() < st.crit;
@@ -1504,7 +1747,29 @@ export class BattleScene extends Phaser.Scene {
     }
 
     // Boss defeat
-    if (e.T.boss) { this.boss = null; this._endBattle(true); return; }
+    if (e.T.boss) {
+      this._showBanner('📋 ĐÃ NỘP!', 'Deadline hạ! Ca làm hoàn thành!', 'syn');
+      this.boss = null;
+      this._endBattle(true);
+      return;
+    }
+
+    // Elite death: explode into 20 emails + drop package (GDD)
+    if (e.type === 'elite') {
+      this.player.stress = Math.max(0, this.player.stress - 10);
+      // Spawn 15 email enemies around death position
+      for (let i = 0; i < 15; i++) {
+        const a = (i / 15) * Math.PI * 2;
+        const dist = 40 + this.rng.next() * 60;
+        const T = { ...ENEMIES.email };
+        this.enemies.push({ x: e.x + Math.cos(a)*dist, y: e.y + Math.sin(a)*dist, type: 'email', T, r: T.r, hp: T.hp, maxHp: T.hp, vx: 0, vy: 0, kvx: 0, kvy: 0, dead: false, flash: 0, stamps: 0, burnStacks: [] });
+      }
+      // Drop evolution package
+      this.gems.push({ x: e.x, y: e.y, xp: 0, isPackage: true, homing: false, collected: false });
+      this._showBanner('💀 Elite hạ!', 'Stress −10 · Gói hàng rơi · 15 email spawn!', 'syn');
+      this.cameras.main.shake(250, 0.01);
+      SFX.boom();
+    }
 
     // Death fx (particles)
     this._deathFx(e);
@@ -1546,6 +1811,8 @@ export class BattleScene extends Phaser.Scene {
 
   // ── Tap handling ──────────────────────────────────────────────────────
   _handleTap(wx, wy, sx, sy) {
+    if (this.player.tapCd > 0) return;
+    this.player.tapCd = 0.15;
     initAudio();
     this.taps++;
     this.tapTimes.push(this.elapsed);
@@ -2077,6 +2344,14 @@ export class BattleScene extends Phaser.Scene {
       if (e.charging) {
         g.lineStyle(3, 0xFF4D6D, 0.8);
         g.strokeCircle(e.x, e.y, e.r + 6);
+      }
+      // Elite: purple crown glow
+      if (e.type === 'elite') {
+        const pulse = 0.5 + 0.5 * Math.sin(this.elapsed * 4);
+        g.lineStyle(3, 0xCE93D8, 0.6 + 0.4 * pulse);
+        g.strokeCircle(e.x, e.y, e.r + 6 + 3 * pulse);
+        g.lineStyle(1.5, 0xFFFFFF, 0.3);
+        g.strokeCircle(e.x, e.y, e.r + 12);
       }
       // Winding telegraph
       if (e.type === 'customer' && e.winding > 0.3) {
